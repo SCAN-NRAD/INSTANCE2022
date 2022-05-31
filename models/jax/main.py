@@ -128,7 +128,7 @@ def main():
             confusion_matrices = ldict["confusion_matrices"]
         else:
             # Loop
-            if i == 20:
+            if i == 120:
                 jax.profiler.start_trace(wandb.run.dir)
 
             img, lab, zooms = load_miccai22(args.data, 1 + i % 90)
@@ -181,7 +181,7 @@ def main():
             if i % 500 == 0:
                 pickle.dump(w, open(f"{wandb.run.dir}/w.pkl", "wb"))
 
-            if i == 20:
+            if i == 120:
                 jax.profiler.stop_trace()
 
             wandb.log(state)
