@@ -1,3 +1,5 @@
 wandb
 train_2
 __pycache__
+*.sh
+*.log-*
