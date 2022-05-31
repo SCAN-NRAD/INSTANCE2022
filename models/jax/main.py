@@ -2,7 +2,7 @@ import argparse
 import shutil
 import time
 from textwrap import dedent
-
+import pickle
 import haiku as hk
 import jax
 import jax.numpy as jnp
@@ -50,7 +50,7 @@ def main():
 
     if args.pretrained is not None:
         print("Loading pretrained parameters...", flush=True)
-        w = np.load(args.pretrained, allow_pickle=True)
+        w = pickle.load(open(args.pretrained, "rb"))
     else:
         print("Initializing model...", flush=True)
         t = time.perf_counter()
@@ -179,8 +179,7 @@ def main():
             }
 
             if i % 500 == 0:
-                # save model using wandb and numpy
-                np.save(f"{wandb.run.dir}/w.npy", w)
+                pickle.dump(w, open(f"{wandb.run.dir}/w.pkl", "wb"))
 
             if i == 20:
                 jax.profiler.stop_trace()

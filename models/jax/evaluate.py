@@ -1,4 +1,5 @@
 import argparse
+import pickle
 import sys
 from functools import partial
 from typing import List
@@ -40,7 +41,7 @@ def main():
     def f(w, x, zooms):
         return hk.without_apply_rng(hk.transform(model.unet_with_groups)).apply(w, x, zooms)
 
-    w = np.load(f"{args.path}/w.npy", allow_pickle=True)
+    w = pickle.load(open(f"{args.path}/w.pkl", "rb"))
 
     for idx in args.indices:
         print(f"Evaluating run {idx}", flush=True)
