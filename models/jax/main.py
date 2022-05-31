@@ -28,7 +28,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
-    parser.add_argument("--data", type=str, default=".", help="Path to data")
+    parser.add_argument("--data", type=str, default="../../train_2", help="Path to data")
     parser.add_argument("--logdir", type=str, default=".", help="Path to log directory")
     parser.add_argument("--seed_init", type=int, default=1, help="Random seed")
     parser.add_argument("--name", type=str, required=True, help="Name of the run")
@@ -50,7 +50,7 @@ def main():
 
     if args.pretrained is not None:
         print("Loading pretrained parameters...", flush=True)
-        w = np.load(args.pretrained)
+        w = np.load(args.pretrained, allow_pickle=True)
     else:
         print("Initializing model...", flush=True)
         t = time.perf_counter()

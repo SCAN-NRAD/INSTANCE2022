@@ -40,7 +40,7 @@ def main():
     def f(w, x, zooms):
         return hk.without_apply_rng(hk.transform(model.unet_with_groups)).apply(w, x, zooms)
 
-    w = np.load(f"{args.path}/w.npy")
+    w = np.load(f"{args.path}/w.npy", allow_pickle=True)
 
     for idx in args.indices:
         print(f"Evaluating run {idx}", flush=True)
