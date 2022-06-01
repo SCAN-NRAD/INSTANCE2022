@@ -52,7 +52,8 @@ def main():
 
     for idx in args.indices:
         print(f"Evaluating run {idx}", end=" ", flush=True)
-        img, lab, zooms = load_miccai22(args.data, idx)
+        img, _, zooms = load_miccai22(args.data, idx)
+        zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
 
         size = (100, 100, 25)
         pads = (16, 16, 1)
