@@ -53,7 +53,7 @@ def main():
         sum = np.zeros_like(img)
         num = np.zeros_like(img)
 
-        for i in tqdm(ite(img.shape[0], size[0], pads[0])):
+        for i in ite(img.shape[0], size[0], pads[0]):
             for j in ite(img.shape[1], size[1], pads[1]):
                 for k in ite(img.shape[2], size[2], pads[2]):
                     x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
@@ -71,20 +71,23 @@ def main():
                         k + pads[2] : k + size[2] - pads[2],
                     ] += 1.0
 
+                    print(".", end="", flush=True)
+
         negative_value = -10.0
         sum[num == 0] = negative_value
         num[num == 0] = 1.0
 
         pred = sum / num
 
-        original = nib.load(f"{args.data}/data/{idx:03d}.nii.gz")
+        original = nib.load(f"{args.data}/label/{idx:03d}.nii.gz")
 
         img = nib.Nifti1Image(pred, original.affine, original.header)
         nib.save(img, f"{args.path}/eval{idx:03d}.nii.gz")
 
         lab = (np.sign(pred) + 1) / 2
+        lab = 2 * original + lab
         img = nib.Nifti1Image(lab, original.affine, original.header)
-        nib.save(img, f"{args.path}/sign{idx:03d}.nii.gz")
+        nib.save(img, f"{args.path}/confusion{idx:03d}.nii.gz")
 
 
 if __name__ == "__main__":
