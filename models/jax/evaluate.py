@@ -43,7 +43,7 @@ def main():
     w = pickle.load(open(f"{args.path}/w.pkl", "rb"))
 
     for idx in args.indices:
-        print(f"Evaluating run {idx}", flush=True)
+        print(f"Evaluating run {idx}", end=" ", flush=True)
         img, lab, zooms = load_miccai22(args.data, idx)
 
         size = (100, 100, 25)
@@ -71,6 +71,7 @@ def main():
                     ] += 1.0
 
                     print(".", end="", flush=True)
+        print(flush=True)
 
         negative_value = -10.0
         sum[num == 0] = negative_value
