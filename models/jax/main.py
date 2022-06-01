@@ -35,6 +35,7 @@ def main():
     parser.add_argument("--name", type=str, required=True, help="Name of the run")
     parser.add_argument("--pretrained", type=str, default=None, help="Path to npy file")
     parser.add_argument("--equivariance", type=str, default="E3", help="Equivariance group")
+    parser.add_argument("--width", type=int, default=5, help="Width of the network")
     args = parser.parse_args()
 
     wandb.init(project="miccai22", name=args.name, dir=args.logdir, config=args)

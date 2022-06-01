@@ -175,7 +175,7 @@ def unet_with_groups(args):
             data = jax.vmap(Convolution(irreps, diameter=2.0 * radius, steps=vox.zooms, **kw), 4, 4)(vox.data)
             return Voxels(zooms=vox.zooms, data=data)
 
-        mul = 5
+        mul = args.width  # default is 5
 
         assert len(input.shape) == 3
         x = Voxels(
