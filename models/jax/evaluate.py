@@ -7,7 +7,6 @@ from typing import List
 import haiku as hk
 import nibabel as nib
 import numpy as np
-from tqdm.auto import tqdm
 
 import jax
 
@@ -85,7 +84,7 @@ def main():
         nib.save(img, f"{args.path}/eval{idx:03d}.nii.gz")
 
         lab = (np.sign(pred) + 1) / 2
-        lab = 2 * original + lab
+        lab = 2 * original.get_fdata() + lab
         img = nib.Nifti1Image(lab, original.affine, original.header)
         nib.save(img, f"{args.path}/confusion{idx:03d}.nii.gz")
 
