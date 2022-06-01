@@ -1,19 +1,20 @@
 import argparse
+import pickle
 import shutil
 import time
+from functools import partial
 from textwrap import dedent
-import pickle
+
 import haiku as hk
-import jax
-import jax.numpy as jnp
 import numpy as np
 import optax
-import wandb
-from jax.config import config
 from sklearn.metrics import confusion_matrix
-from functools import partial
 
-from functions import format_time, load_miccai22, random_sample, unpad, cross_entropy
+import jax
+import jax.numpy as jnp
+import wandb
+from functions import cross_entropy, format_time, load_miccai22, random_sample, unpad
+from jax.config import config
 from model import unet_with_groups
 
 config.update("jax_debug_nans", True)
@@ -33,20 +34,24 @@ def main():
     parser.add_argument("--seed_init", type=int, default=1, help="Random seed")
     parser.add_argument("--name", type=str, required=True, help="Name of the run")
     parser.add_argument("--pretrained", type=str, default=None, help="Path to npy file")
+    parser.add_argument("--equivariance", type=str, default="E3", help="Equivariance group")
     args = parser.parse_args()
 
-    wandb.init(project="miccai22", name=args.name, dir=args.logdir)
+    wandb.init(project="miccai22", name=args.name, dir=args.logdir, config=args)
     shutil.copy(__file__, f"{wandb.run.dir}/main.py")
     shutil.copy("./model.py", f"{wandb.run.dir}/model.py")
     shutil.copy("./functions.py", f"{wandb.run.dir}/functions.py")
     shutil.copy("./evaluate.py", f"{wandb.run.dir}/evaluate.py")
+
+    with open(f"{wandb.run.dir}/args.pkl", "wb") as f:
+        pickle.dump(args, f)
 
     # Load data
     print("Loading data...", flush=True)
     img, lab, zooms = load_miccai22(args.data, 1)
 
     # Create model
-    model = hk.without_apply_rng(hk.transform(unet_with_groups))
+    model = hk.without_apply_rng(hk.transform(unet_with_groups(args)))
 
     if args.pretrained is not None:
         print("Loading pretrained parameters...", flush=True)
@@ -160,11 +165,11 @@ def main():
                 (
                     f"{wandb.run.dir.split('/')[-2]} "
                     f"[{i + 1:04d}:{format_time(time.perf_counter() - time0)}] "
-                    f"train[ loss={train_loss:.2f} "
-                    f"1={np.sum(lab == 1)} "
+                    f"train[ loss={train_loss:.3f} "
+                    f"1={1000 * np.mean(lab == 1):03.0f}/1e3 "
                     f"tn={epoch_avg_confusion[0, 0]:.2f} tp={epoch_avg_confusion[1, 1]:.2f} "
                     f"fn={epoch_avg_confusion[1, 0]:.2f} fp={epoch_avg_confusion[0, 1]:.2f} "
-                    f"min-median-max={min_median_max[0]:.2f} {min_median_max[1]:.2f} {min_median_max[2]:.2f} ]"
+                    f"min-median-max={min_median_max[0]:.2f} {min_median_max[1]:.2f} {min_median_max[2]:.2f} ] "
                     f"update_time={format_time(time.perf_counter() - t0)} "
                 ),
                 flush=True,
@@ -184,7 +189,8 @@ def main():
             }
 
             if i % 500 == 0:
-                pickle.dump(w, open(f"{wandb.run.dir}/w.pkl", "wb"))
+                with open(f"{wandb.run.dir}/w.pkl", "wb") as f:
+                    pickle.dump(w, f)
 
             if i == 120:
                 jax.profiler.stop_trace()
