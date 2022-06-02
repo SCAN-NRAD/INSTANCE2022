@@ -115,7 +115,7 @@ def unet_with_groups(args):
             jnp.ndarray: output data of shape ``(x, y, z)``
         """
         irreps_sh = e3nn.Irreps("0e + 1o + 2e" if args.equivariance == "E3" else "0e + 1e + 2e")
-        kw = dict(irreps_sh=irreps_sh, num_radial_basis=2)
+        kw = dict(irreps_sh=irreps_sh, num_radial_basis=args.num_radial_basis)
 
         def cbg(vox: Voxels, mul: float, *, radius: float, filter=None, normalize=True) -> Voxels:
             mul = round(mul)
@@ -136,7 +136,7 @@ def unet_with_groups(args):
             x = vox.data
 
             # Linear
-            x = n_vmap(1 + 3, MixChannels(mul, irreps))(x)
+            x = n_vmap(1 + 3, MixChannels(mul, x.irreps))(x)
             if normalize:
                 x = bn(x)
             x = g(x)
@@ -170,10 +170,12 @@ def unet_with_groups(args):
             vox = jax.vmap(lambda x: upsample(x, high_vox.zooms, high_vox.data.shape[1:4]), 4, 4)(low_vox)
             return cat(vox, high_vox)
 
-        def conv(irreps: e3nn.Irreps, vox: Voxels, radius: float) -> Voxels:
+        def group_conv(vox: Voxels, *, irreps: e3nn.Irreps, mul: int, radius: float) -> Voxels:
             assert len(vox.data.shape) == 1 + 3 + 1
-            data = jax.vmap(Convolution(irreps, diameter=2.0 * radius, steps=vox.zooms, **kw), 4, 4)(vox.data)
-            return Voxels(zooms=vox.zooms, data=data)
+            x = vox.data
+            x = n_vmap(1 + 3, MixChannels(mul, x.irreps))(x)
+            x = jax.vmap(Convolution(irreps, diameter=2.0 * radius, steps=vox.zooms, **kw), 4, 4)(x)
+            return Voxels(zooms=vox.zooms, data=x)
 
         mul = args.width  # default is 5
 
@@ -182,55 +184,69 @@ def unet_with_groups(args):
             zooms=zooms, data=e3nn.IrrepsData.from_contiguous("0e", input[None, :, :, :, None, None])
         )  # Voxel of shape (batch, x, y, z, channel, irreps)
 
-        r = 0.9
+        min_zoom = args.min_zoom
 
         # Block A
         print_stats("Block A", x)
-        x = conv(f"{round(mul)}x0e + {round(mul)}x1o" if args.equivariance == "E3" else f"{round(mul)}x0e", x, radius=r)
-        x_a = x = cbg(
+        x = group_conv(
+            x,
+            irreps="0e + 1o" if args.equivariance == "E3" else "0e + 1e",
+            mul=round(mul),
+            radius=2.5 * min_zoom,
+        )
+        x = cbg(
             x,
             mul,
             filter=["0e", "0o", "1e", "1o"],
-            radius=r,
+            radius=2.5 * min_zoom,
         )
-        x = down(x, min_zoom=r)
+        min_zoom *= 2.0
+        x_a = x
+        x = down(x, min_zoom=min_zoom)
 
         # Block B
         print_stats("Block B", x)
-        x = cbg(x, 3 * mul, radius=2.5 * r)
-        x_b = x = cbg(x, 3 * mul, radius=2.5 * r)
-        x = down(x, min_zoom=2.0 * r)
+        x = cbg(x, 3 * mul, radius=2.5 * min_zoom)
+        x = cbg(x, 3 * mul, radius=2.5 * min_zoom)
+        min_zoom *= 2.0
+        x_b = x
+        x = down(x, min_zoom=min_zoom)
 
         # Block C
         print_stats("Block C", x)
-        x = cbg(x, 6 * mul, radius=2.5 * 2.0 * r)
-        x_c = x = cbg(x, 6 * mul, radius=2.5 * 2.0 * r)
-        x = down(x, min_zoom=4.0 * r)
+        x = cbg(x, 6 * mul, radius=2.5 * min_zoom)
+        x = cbg(x, 6 * mul, radius=2.5 * min_zoom)
+        min_zoom *= 2.0
+        x_c = x
+        x = down(x, min_zoom=min_zoom)
 
         # Block D
         print_stats("Block D", x)
-        x = cbg(x, 10 * mul, radius=2.5 * 4.0 * r)
-        x = cbg(x, 10 * mul, radius=2.5 * 4.0 * r)
-        x = cbg(x, 10 * mul, radius=2.5 * 4.0 * r)
+        x = cbg(x, 10 * mul, radius=2.5 * min_zoom)
+        x = cbg(x, 10 * mul, radius=2.5 * min_zoom)
+        x = cbg(x, 10 * mul, radius=2.5 * min_zoom)
 
         # Block E
         print_stats("Block E", x)
         x = upcat(x, x_c)
-        x = cbg(x, 6 * mul, radius=2.5 * 2.0 * r)
-        x = cbg(x, 6 * mul, radius=2.5 * 2.0 * r)
+        min_zoom /= 2.0
+        x = cbg(x, 6 * mul, radius=2.5 * min_zoom)
+        x = cbg(x, 6 * mul, radius=2.5 * min_zoom)
 
         # Block F
         print_stats("Block F", x)
         x = upcat(x, x_b)
-        x = cbg(x, 3 * mul, radius=2.5 * r)
-        x = cbg(x, mul, filter=["0e", "0o", "1e", "1o"], radius=2.5 * r)
+        min_zoom /= 2.0
+        x = cbg(x, 3 * mul, radius=2.5 * min_zoom)
+        x = cbg(x, mul, filter=["0e", "0o", "1e", "1o"], radius=2.5 * min_zoom)
 
         # Block G
         print_stats("Block G", x)
         x = upcat(x, x_a)
-        x = cbg(x, mul, filter=["0e", "1o", "2e"], radius=r)
+        min_zoom /= 2.0
+        x = cbg(x, mul, filter=["0e", "1o", "2e"] if args.equivariance == "E3" else ["0e", "1e", "2e"], radius=2.5 * min_zoom)
 
-        x = conv("8x0e", x, radius=r)
+        x = group_conv(x, irreps="0e", mul=round(2 * mul), radius=2.5 * min_zoom)
 
         x = x.data.repeat_irreps_by_last_axis()  # [batch, x, y, z, irreps]
 

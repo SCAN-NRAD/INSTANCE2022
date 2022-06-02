@@ -5,3 +5,4 @@ __pycache__
 *.log-*
 foo.py
 models/jax/offline-run*
+data.ipynb
