@@ -136,7 +136,7 @@ def unet_with_groups(args):
             x = vox.data
 
             # Linear
-            x = n_vmap(1 + 3, MixChannels(mul, x.irreps))(x)
+            x = n_vmap(1 + 3, MixChannels(mul, irreps))(x)
             if normalize:
                 x = bn(x)
             x = g(x)
