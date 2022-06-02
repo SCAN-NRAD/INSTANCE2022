@@ -42,7 +42,7 @@ def main():
         train_args = pickle.load(f)
 
     @partial(jax.jit, static_argnums=(2,))
-    def f(w, x, zooms):
+    def apply(w, x, zooms):
         return hk.without_apply_rng(hk.transform(model.unet_with_groups(train_args))).apply(w, x, zooms)
 
     with open(f"{args.path}/w.pkl", "rb") as f:
@@ -65,7 +65,7 @@ def main():
             for j in ite(img.shape[1], size[1], pads[1]):
                 for k in ite(img.shape[2], size[2], pads[2]):
                     x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
-                    p = f(w, x, zooms)
+                    p = apply(w, x, zooms)
                     p = unpad(p, pads)
 
                     sum[
