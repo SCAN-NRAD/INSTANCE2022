@@ -12,7 +12,7 @@ import scipy.ndimage as ndi
 import logging
 
 class INSTANCE_2022(Dataset):
-    def __init__(self, cases_file = None, patch_size = 128):
+    def __init__(self, cases_file = None, patch_size = 128,check_labels=False):
 
         if os.uname()[1] == 'scanwkp11':
             self.base_dir = '/str/nas/INSTANCE2022/'
@@ -27,6 +27,7 @@ class INSTANCE_2022(Dataset):
             self.ids = os.listdir(os.path.join(self.base_dir,'rawdata'))
 
         self.patch_size = patch_size
+        self.check_labels = check_labels
 
     def __len__(self):
         return len(self.ids)
@@ -63,7 +64,7 @@ class INSTANCE_2022(Dataset):
 
         #get a random patch inside the volume of size (patch_size,patch_size,patch_size)  
         if self.patch_size > 0:
-            img, label  = self.random_patch(img,label,self.patch_size,check_labels=False)
+            img, label  = self.random_patch(img,label,self.patch_size,check_labels=self.check_labels)
 
         img = np.expand_dims(img, 0)
 

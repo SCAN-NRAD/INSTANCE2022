@@ -44,7 +44,7 @@ def train_equivariant(epoch_end,cutoff='right',downsample=3,gpu='cuda',equivaria
 
     training_cases = 'training_cases.txt'
 
-    dataset = INSTANCE_2022(training_cases, patch_size = 256) 
+    dataset = INSTANCE_2022(training_cases, patch_size = 200) 
 
     device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
 
@@ -87,7 +87,7 @@ def predict_equivariant(gpu='cuda', downsample = 3, cutoff='right',equivariance=
 
         img = batch['image'][0,...]
         label = batch['label']
-        output = model.predict_3D(torch.from_numpy(img.numpy()).float().cuda(),do_mirroring=False, patch_size=(256,256,256),
+        output = model.predict_3D(torch.from_numpy(img.numpy()).float().cuda(),do_mirroring=False, patch_size=(200,200,200),
                                 use_sliding_window=True, use_gaussian = True,verbose=False)
 
         pred_file_name = sav_dir+os.path.basename(batch['name'][0])+f'_pred.nii.gz'
