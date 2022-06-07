@@ -20,8 +20,9 @@ def load_miccai22(path: str, i: int) -> Tuple[np.ndarray, np.ndarray, Tuple[floa
     image = image.get_fdata()
     label = label.get_fdata()
 
-    image = np.clip((image + 50.0) / (50.0 + 30.0), a_min=0.0, a_max=3.0)
+    image = 2.5 * np.clip(image / 80.0, a_min=0.0, a_max=1.0)
     image = image.astype(np.float32)
+
     label = 2.0 * label - 1.0
     label = label.astype(np.float32)
     return image, label, zooms
