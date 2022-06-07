@@ -71,6 +71,10 @@ def main():
     def un(img):
         return unpad(img, (16, 16, 1))
 
+    @partial(jax.jit, static_argnums=(2,))
+    def apply_model(w, x, zooms):
+        return model.apply(w, x, zooms)
+
     @partial(jax.jit, static_argnums=(4,))
     def update(w, opt_state, x, y, zooms, lr):
         r"""Update the model parameters.
@@ -159,8 +163,17 @@ def main():
             w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, args.lr)
             train_loss.block_until_ready()
 
-            confusion_matrices.append(confusion_matrix(lab.flatten() > 0.0, train_pred.flatten() > 0.0))
-            epoch_avg_confusion = np.mean(confusion_matrices[-90:], axis=0)
+            img, lab, zooms = load_miccai22(args.data, 91 + i % 10)  # test data
+            zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
+            center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
+            start = np.maximum(center_of_mass - np.array(sample_size) // 2, 0)
+            end = start + np.array(sample_size)
+            img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
+            lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
+            test_pred = apply_model(w, img, zooms)
+
+            confusion_matrices.append(confusion_matrix(lab.flatten() > 0.0, test_pred.flatten() > 0.0))
+            epoch_avg_confusion = np.mean(confusion_matrices[-10:], axis=0)
             epoch_avg_confusion = epoch_avg_confusion / np.sum(epoch_avg_confusion)
 
             min_median_max = np.min(train_pred), np.median(train_pred), np.max(train_pred)
@@ -170,7 +183,6 @@ def main():
                     f"{wandb.run.dir.split('/')[-2]} "
                     f"[{i + 1:04d}:{format_time(time.perf_counter() - time0)}] "
                     f"train[ loss={train_loss:.3f} "
-                    f"1={1000 * np.mean(lab == 1):03.0f}/1e3 "
                     f"tn={epoch_avg_confusion[0, 0]:.2f} tp={epoch_avg_confusion[1, 1]:.2f} "
                     f"fn={epoch_avg_confusion[1, 0]:.2f} fp={epoch_avg_confusion[0, 1]:.2f} "
                     f"min-median-max={min_median_max[0]:.2f} {min_median_max[1]:.2f} {min_median_max[2]:.2f} ] "
