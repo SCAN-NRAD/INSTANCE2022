@@ -12,7 +12,7 @@ from monai.metrics.hausdorff_distance import compute_hausdorff_distance
 import jax
 
 
-def ite(total: int, size: int, pad: int) -> List[int]:
+def ite(total: int, size: int, pad: int, overlap: float) -> List[int]:
     r"""
     Generate a list of patch indices such that the center of the patches (unpaded patches) cover the full image.
 
@@ -21,7 +21,7 @@ def ite(total: int, size: int, pad: int) -> List[int]:
         size: The size of the patch.
         pad: The padding of the patch.
     """
-    naive = list(range(0, total - size, size - 2 * pad)) + [total - size]
+    naive = list(range(0, total - size, round((size - 2 * pad) / overlap))) + [total - size]
     return np.round(np.linspace(0, total - size, len(naive))).astype(int)
 
 
@@ -57,13 +57,25 @@ def main():
 
         size = (100, 100, 25)
         pads = (16, 16, 1)
+        overlap = 2.0
+
+        pos = np.stack(
+            np.meshgrid(
+                np.linspace(-1.3, 1.3, size[0] - 2 * pads[0]),
+                np.linspace(-1.3, 1.3, size[1] - 2 * pads[1]),
+                np.linspace(-1.3, 1.3, size[2] - 2 * pads[2]),
+                indexing="ij",
+            ),
+            axis=-1,
+        )
+        gaussian = np.exp(-np.linalg.norm(pos, axis=-1) ** 2)
 
         sum = np.zeros_like(img)
         num = np.zeros_like(img)
 
-        for i in ite(img.shape[0], size[0], pads[0]):
-            for j in ite(img.shape[1], size[1], pads[1]):
-                for k in ite(img.shape[2], size[2], pads[2]):
+        for i in ite(img.shape[0], size[0], pads[0], overlap):
+            for j in ite(img.shape[1], size[1], pads[1], overlap):
+                for k in ite(img.shape[2], size[2], pads[2], overlap):
                     x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
                     p = apply(w, x, zooms)
                     p = unpad(p, pads)
@@ -72,12 +84,14 @@ def main():
                         i + pads[0] : i + size[0] - pads[0],
                         j + pads[1] : j + size[1] - pads[1],
                         k + pads[2] : k + size[2] - pads[2],
-                    ] += p
+                    ] += (
+                        p * gaussian
+                    )
                     num[
                         i + pads[0] : i + size[0] - pads[0],
                         j + pads[1] : j + size[1] - pads[1],
                         k + pads[2] : k + size[2] - pads[2],
-                    ] += 1.0
+                    ] += gaussian
 
                     print(".", end="", flush=True)
         print(flush=True)
