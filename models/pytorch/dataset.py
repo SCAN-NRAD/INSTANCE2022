@@ -17,7 +17,7 @@ class INSTANCE_2022(Dataset):
         if os.uname()[1] == 'scanwkp11':
             self.base_dir = '/str/nas/INSTANCE2022/'
         else:
-            self.base_dir = '/home/diaz/data/INSTANCE2022/'
+            self.base_dir = '/home/diaz/data/'
 
         if cases_file is not None:
             with open(cases_file) as f:
