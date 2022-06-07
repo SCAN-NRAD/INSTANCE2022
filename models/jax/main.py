@@ -38,6 +38,7 @@ def main():
     parser.add_argument("--width", type=int, default=5, help="Width of the network")
     parser.add_argument("--num_radial_basis", type=int, default=2, help="Number of radial basis functions")
     parser.add_argument("--min_zoom", type=float, default=0.36, help="Minimum zoom")
+    parser.add_argument("--downsampling", type=float, default=2.0, help="Downsampling factor")
     args = parser.parse_args()
 
     wandb.init(project="miccai22", name=args.name, dir=args.logdir, config=args)

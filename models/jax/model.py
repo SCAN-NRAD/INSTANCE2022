@@ -200,7 +200,7 @@ def unet_with_groups(args):
             filter=["0e", "0o", "1e", "1o"],
             radius=2.5 * min_zoom,
         )
-        min_zoom *= 2.0
+        min_zoom *= args.downsampling
         x_a = x
         x = down(x, min_zoom=min_zoom)
 
@@ -208,7 +208,7 @@ def unet_with_groups(args):
         print_stats("Block B", x)
         x = cbg(x, 3 * mul, radius=2.5 * min_zoom)
         x = cbg(x, 3 * mul, radius=2.5 * min_zoom)
-        min_zoom *= 2.0
+        min_zoom *= args.downsampling
         x_b = x
         x = down(x, min_zoom=min_zoom)
 
@@ -216,7 +216,7 @@ def unet_with_groups(args):
         print_stats("Block C", x)
         x = cbg(x, 6 * mul, radius=2.5 * min_zoom)
         x = cbg(x, 6 * mul, radius=2.5 * min_zoom)
-        min_zoom *= 2.0
+        min_zoom *= args.downsampling
         x_c = x
         x = down(x, min_zoom=min_zoom)
 
@@ -229,21 +229,21 @@ def unet_with_groups(args):
         # Block E
         print_stats("Block E", x)
         x = upcat(x, x_c)
-        min_zoom /= 2.0
+        min_zoom /= args.downsampling
         x = cbg(x, 6 * mul, radius=2.5 * min_zoom)
         x = cbg(x, 6 * mul, radius=2.5 * min_zoom)
 
         # Block F
         print_stats("Block F", x)
         x = upcat(x, x_b)
-        min_zoom /= 2.0
+        min_zoom /= args.downsampling
         x = cbg(x, 3 * mul, radius=2.5 * min_zoom)
         x = cbg(x, mul, filter=["0e", "0o", "1e", "1o"], radius=2.5 * min_zoom)
 
         # Block G
         print_stats("Block G", x)
         x = upcat(x, x_a)
-        min_zoom /= 2.0
+        min_zoom /= args.downsampling
         x = cbg(x, mul, filter=["0e", "1o", "2e"] if args.equivariance == "E3" else ["0e", "1e", "2e"], radius=2.5 * min_zoom)
 
         x = group_conv(x, irreps="0e", mul=round(2 * mul), radius=2.5 * min_zoom)
