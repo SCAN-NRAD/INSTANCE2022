@@ -81,7 +81,8 @@ class INSTANCE_2022(Dataset):
         x,y,z = input_array.shape
 
         patchFound = False
-        while not patchFound:
+        tries = 0
+        while not patchFound and tries < 50:
             min_x = min_y = min_z = 0 
             max_x, max_y, max_z = x,y,z
             
@@ -101,12 +102,10 @@ class INSTANCE_2022(Dataset):
             if check_labels == False:
                 patchFound = True
             else:
-                for i in [-1,0,1]:
-                    if i == 0:
-                        continue
-                    if (output_label == i).sum() == 0:
-                        print('missing label. applying new random patch')
-                        break
+                if (output_label == 1).sum() == 0:
+                    print('missing label. applying new random patch')
+                    tries += 1
+                else:
                     patchFound = True
         
         return output_array, output_label
