@@ -14,7 +14,10 @@ import logging
 class INSTANCE_2022(Dataset):
     def __init__(self, cases_file = None, patch_size = 128):
 
-        self.base_dir = '/str/nas/INSTANCE2022/'
+        if os.uname()[1] == 'scanwkp11':
+            self.base_dir = '/str/nas/INSTANCE2022/'
+        else:
+            self.base_dir = '/home/diaz/data/INSTANCE2022/'
 
         if cases_file is not None:
             with open(cases_file) as f:

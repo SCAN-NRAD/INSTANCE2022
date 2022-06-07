@@ -77,7 +77,7 @@ def predict_equivariant(gpu='cuda', downsample = 3, cutoff='right',equivariance=
     device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
     model = UNet(2,0,5,5,(0.5,0.5,5),n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
 
-    checkpoint = torch.load(checkpoint_dir+'model_min.pt',map_location=gpu)
+    checkpoint = torch.load(checkpoint_dir+'/model_min.pt',map_location=gpu)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
