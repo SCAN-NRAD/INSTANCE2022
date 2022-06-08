@@ -39,6 +39,7 @@ def main():
     parser.add_argument("--num_radial_basis", type=int, default=2, help="Number of radial basis functions")
     parser.add_argument("--min_zoom", type=float, default=0.36, help="Minimum zoom")
     parser.add_argument("--downsampling", type=float, default=2.0, help="Downsampling factor")
+    parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
     args = parser.parse_args()
 
     wandb.init(project="miccai22", name=args.name, dir=args.logdir, config=args)
@@ -55,7 +56,12 @@ def main():
     img, lab, zooms = load_miccai22(args.data, 1)
 
     # Create model
-    model = hk.without_apply_rng(hk.transform(unet_with_groups(args)))
+    if args.dummy:
+        model = hk.without_apply_rng(
+            hk.transform(lambda x, zooms: jax.vmap(jax.vmap(jax.vmap(hk.Linear(1))))(x[..., None])[..., 0])
+        )
+    else:
+        model = hk.without_apply_rng(hk.transform(unet_with_groups(args)))
 
     if args.pretrained is not None:
         print("Loading pretrained parameters...", flush=True)
@@ -109,6 +115,8 @@ def main():
         return w, opt_state, loss, pred
 
     last_code = None
+    var = locals()
+
     # Init
     print("Init statistics...", flush=True)
     time0 = time.perf_counter()
@@ -116,23 +124,29 @@ def main():
     # Init
 
     for i in range(144_001):
+        var["i"] = i
+
         ok = True
         if ok:
             for trial in range(10):
                 try:
-                    code = dedent(open(f"{wandb.run.dir}/main.py", "r").read().split("# Loop")[3])
+                    with open(f"{wandb.run.dir}/main.py", "r") as f:
+                        code = dedent(f.read().split("# Loop")[3])
                     if code != last_code:
-                        code = dedent(open(f"{wandb.run.dir}/main.py", "r").read().split("# Init")[1])
-                        exec(code)
-                        code = dedent(open(f"{wandb.run.dir}/main.py", "r").read().split("# Loop")[3])
+                        with open(f"{wandb.run.dir}/main.py", "r") as f:
+                            code = dedent(f.read().split("# Init")[1])
+                        exec(code, globals(), var)
+                        with open(f"{wandb.run.dir}/main.py", "r") as f:
+                            code = dedent(f.read().split("# Loop")[3])
                         last_code = code
-                    exec(code)
+                    exec(code, globals(), var)
                     ok = True
                     break
                 except Exception as e:
                     ok = False
+                    print(f"Trial {trial} failed", flush=True)
                     print(e)
-                    print(f"Trial {trial} failed, retrying again in 1min...", flush=True)
+                    print("\nRetrying again in 1min...", flush=True)
                     time.sleep(60)
             if not ok:
                 raise Exception("Failed to run loop in 10 trials, aborting")
@@ -160,6 +174,8 @@ def main():
             w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, args.lr)
             train_loss.block_until_ready()
 
+            t1 = time.perf_counter()
+
             img, lab, zooms = load_miccai22(args.data, 91 + i % 10)  # test data
             zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
             center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
@@ -173,6 +189,8 @@ def main():
             epoch_avg_confusion = np.mean(confusion_matrices[-10:], axis=0)
             epoch_avg_confusion = epoch_avg_confusion / np.sum(epoch_avg_confusion)
 
+            t2 = time.perf_counter()
+
             min_median_max = np.min(train_pred), np.median(train_pred), np.max(train_pred)
 
             print(
@@ -183,7 +201,8 @@ def main():
                     f"tn={epoch_avg_confusion[0, 0]:.2f} tp={epoch_avg_confusion[1, 1]:.2f} "
                     f"fn={epoch_avg_confusion[1, 0]:.2f} fp={epoch_avg_confusion[0, 1]:.2f} "
                     f"min-median-max={min_median_max[0]:.2f} {min_median_max[1]:.2f} {min_median_max[2]:.2f} ] "
-                    f"update_time={format_time(time.perf_counter() - t0)} "
+                    f"update_time={format_time(t1 - t0)} "
+                    f"test_time={format_time(t2 - t1)} "
                 ),
                 flush=True,
             )
