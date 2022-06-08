@@ -121,6 +121,19 @@ def main():
     print("Init statistics...", flush=True)
     time0 = time.perf_counter()
     confusion_matrices = []
+    sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
+
+    test_set = []
+    for i in range(91, 100 + 1):
+        img, lab, zooms = load_miccai22(args.data, i)  # test data
+        zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
+        center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
+        start = np.maximum(center_of_mass - np.array(sample_size) // 2, 0)
+        end = np.minimum(start + np.array(sample_size), np.array(img.shape))
+        start = end - np.array(sample_size)
+        img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
+        lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
+        test_set.append((img, lab, zooms))
     # Init
 
     for i in range(144_001):
@@ -159,7 +172,6 @@ def main():
 
             # regroup zooms and sizes by rounding and taking subsets of the volume
             zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
-            sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
             if np.random.rand() < 0.5:
                 while True:
                     x, y = random_sample(img, lab, sample_size)
@@ -175,21 +187,13 @@ def main():
             train_loss.block_until_ready()
 
             t1 = time.perf_counter()
-
-            img, lab, zooms = load_miccai22(args.data, 91 + i % 10)  # test data
-            zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
-            center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
-            start = np.maximum(center_of_mass - np.array(sample_size) // 2, 0)
-            end = start + np.array(sample_size)
-            img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
-            lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
+            img, lab, zooms = test_set[i % 10]
             test_pred = apply_model(w, img, zooms)
-
+            t2 = time.perf_counter()
             confusion_matrices.append(confusion_matrix(un(lab).flatten() > 0.0, un(test_pred).flatten() > 0.0))
             epoch_avg_confusion = np.mean(confusion_matrices[-10:], axis=0)
             epoch_avg_confusion = epoch_avg_confusion / np.sum(epoch_avg_confusion)
-
-            t2 = time.perf_counter()
+            t3 = time.perf_counter()
 
             min_median_max = np.min(train_pred), np.median(train_pred), np.max(train_pred)
 
@@ -202,7 +206,7 @@ def main():
                     f"fn={epoch_avg_confusion[1, 0]:.2f} fp={epoch_avg_confusion[0, 1]:.2f} "
                     f"min-median-max={min_median_max[0]:.2f} {min_median_max[1]:.2f} {min_median_max[2]:.2f} ] "
                     f"update_time={format_time(t1 - t0)} "
-                    f"test_time={format_time(t2 - t1)} "
+                    f"test_time={format_time(t2 - t1)}+{format_time(t3 - t2)} "
                 ),
                 flush=True,
             )
