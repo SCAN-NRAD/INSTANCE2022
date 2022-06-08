@@ -151,10 +151,8 @@ def main():
                         code = dedent(f.read().split("# Loop")[3])
                     if code != last_code:
                         with open(f"{wandb.run.dir}/main.py", "r") as f:
-                            code = dedent(f.read().split("# Init")[1])
-                        exec(code, globals(), var)
-                        with open(f"{wandb.run.dir}/main.py", "r") as f:
-                            code = dedent(f.read().split("# Loop")[3])
+                            init_code = dedent(f.read().split("# Init")[1])
+                        exec(init_code, globals(), var)
                         last_code = code
                     exec(code, globals(), var)
                     ok = True
