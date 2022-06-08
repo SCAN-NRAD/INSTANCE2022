@@ -185,7 +185,7 @@ def main():
             lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
             test_pred = apply_model(w, img, zooms)
 
-            confusion_matrices.append(confusion_matrix(lab.flatten() > 0.0, test_pred.flatten() > 0.0))
+            confusion_matrices.append(confusion_matrix(un(lab).flatten() > 0.0, un(test_pred).flatten() > 0.0))
             epoch_avg_confusion = np.mean(confusion_matrices[-10:], axis=0)
             epoch_avg_confusion = epoch_avg_confusion / np.sum(epoch_avg_confusion)
 
