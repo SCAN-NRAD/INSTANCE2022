@@ -125,6 +125,7 @@ def main():
                         code = dedent(open(f"{wandb.run.dir}/main.py", "r").read().split("# Init")[1])
                         exec(code)
                         code = dedent(open(f"{wandb.run.dir}/main.py", "r").read().split("# Loop")[3])
+                        last_code = code
                     exec(code)
                     ok = True
                     break
