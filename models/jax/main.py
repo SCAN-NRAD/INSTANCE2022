@@ -123,6 +123,8 @@ def main():
     confusion_matrices = []
     sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
 
+    train_set = [load_miccai22(args.data, i) for i in range(1, 90 + 1)]
+
     test_set = []
     for i in range(91, 100 + 1):
         img, lab, zooms = load_miccai22(args.data, i)  # test data
@@ -173,8 +175,7 @@ def main():
             if i == 120:
                 jax.profiler.start_trace(wandb.run.dir)
 
-            img, lab, zooms = load_miccai22(args.data, 1 + i % 90)
-            t01 = time.perf_counter()
+            img, lab, zooms = train_set[i % len(train_set)]
 
             # regroup zooms and sizes by rounding and taking subsets of the volume
             zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
@@ -212,7 +213,7 @@ def main():
                     f"fn={epoch_avg_confusion[1, 0]:.2f} fp={epoch_avg_confusion[0, 1]:.2f} "
                     f"min-median-max={min_median_max[0]:.2f} {min_median_max[1]:.2f} {min_median_max[2]:.2f} ] "
                     f"time="
-                    f"L{format_time(t01 - t0)}+S{format_time(t1 - t01)}"
+                    f"S{format_time(t1 - t0)}"
                     f"U{format_time(t2 - t1)}+"
                     f"E{format_time(t3 - t2)}+C{format_time(t4 - t3)}+"
                     f"EX{format_time(t_extra)} "
