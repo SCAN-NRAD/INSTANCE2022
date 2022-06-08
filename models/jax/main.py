@@ -108,26 +108,24 @@ def main():
         w = optax.apply_updates(w, updates)
         return w, opt_state, loss, pred
 
+    last_code = None
+    # Init
+    print("Init statistics...", flush=True)
     time0 = time.perf_counter()
     confusion_matrices = []
+    # Init
 
     for i in range(144_001):
         ok = True
         if ok:
-            ldict = {
-                "i": i,
-                "w": w,
-                "opt_state": opt_state,
-                "time0": time0,
-                "args": args,
-                "update": update,
-                "confusion_matrices": confusion_matrices,
-                "un": un,
-            }
             for trial in range(10):
                 try:
-                    code = dedent(open(f"{wandb.run.dir}/main.py", "r").read().split("# Loop")[2])
-                    exec(code, globals(), ldict)
+                    code = dedent(open(f"{wandb.run.dir}/main.py", "r").read().split("# Loop")[3])
+                    if code != last_code:
+                        code = dedent(open(f"{wandb.run.dir}/main.py", "r").read().split("# Init")[1])
+                        exec(code)
+                        code = dedent(open(f"{wandb.run.dir}/main.py", "r").read().split("# Loop")[3])
+                    exec(code)
                     ok = True
                     break
                 except Exception as e:
@@ -137,8 +135,6 @@ def main():
                     time.sleep(60)
             if not ok:
                 raise Exception("Failed to run loop in 10 trials, aborting")
-            w = ldict["w"]
-            confusion_matrices = ldict["confusion_matrices"]
         else:
             # Loop
             if i == 120:
