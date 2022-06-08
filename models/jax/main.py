@@ -134,6 +134,8 @@ def main():
         img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         test_set.append((img, lab, zooms))
+
+    t4 = time.perf_counter()
     # Init
 
     for i in range(144_001):
@@ -165,6 +167,9 @@ def main():
                 raise Exception("Failed to run loop in 10 trials, aborting")
         else:
             # Loop
+            t0 = time.perf_counter()
+            t_extra = t0 - t4
+
             if i == 120:
                 jax.profiler.start_trace(wandb.run.dir)
 
@@ -181,21 +186,21 @@ def main():
             else:
                 img, lab = random_sample(img, lab, sample_size)
 
-            t0 = time.perf_counter()
+            t1 = time.perf_counter()
 
             w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, args.lr)
             train_loss.block_until_ready()
 
-            t1 = time.perf_counter()
+            t2 = time.perf_counter()
             img, lab, zooms = test_set[i % 10]
             test_pred = apply_model(w, img, zooms)
-            t2 = time.perf_counter()
+            t3 = time.perf_counter()
             confusion_matrices.append(confusion_matrix(un(lab).flatten() > 0.0, un(test_pred).flatten() > 0.0))
             epoch_avg_confusion = np.mean(confusion_matrices[-10:], axis=0)
             epoch_avg_confusion = epoch_avg_confusion / np.sum(epoch_avg_confusion)
-            t3 = time.perf_counter()
 
             min_median_max = np.min(train_pred), np.median(train_pred), np.max(train_pred)
+            t4 = time.perf_counter()
 
             print(
                 (
@@ -205,8 +210,10 @@ def main():
                     f"tn={epoch_avg_confusion[0, 0]:.2f} tp={epoch_avg_confusion[1, 1]:.2f} "
                     f"fn={epoch_avg_confusion[1, 0]:.2f} fp={epoch_avg_confusion[0, 1]:.2f} "
                     f"min-median-max={min_median_max[0]:.2f} {min_median_max[1]:.2f} {min_median_max[2]:.2f} ] "
-                    f"update_time={format_time(t1 - t0)} "
-                    f"test_time={format_time(t2 - t1)}+{format_time(t3 - t2)} "
+                    f"time="
+                    f"L{format_time(t1 - t0)}+U{format_time(t2 - t1)}+"
+                    f"E{format_time(t3 - t2)}+C{format_time(t4 - t3)}+"
+                    f"EX{format_time(t_extra)} "
                 ),
                 flush=True,
             )
