@@ -173,18 +173,23 @@ def main():
         epoch_avg_confusion = np.mean(confusion_matrices, axis=0)
         epoch_avg_confusion = epoch_avg_confusion / np.sum(epoch_avg_confusion)
 
+        dice = (
+            2
+            * confusion_matrices[:, 1, 1]
+            / (2 * confusion_matrices[:, 1, 1] + confusion_matrices[:, 1, 0] + confusion_matrices[:, 0, 1])
+        )
+
         min_median_max = np.min(train_pred), np.median(train_pred), np.max(train_pred)
         t4 = time.perf_counter()
 
+        dice_txt = ",".join(f"{d:.2f}" for d in dice)
         print(
             (
                 f"{wandb.run.dir.split('/')[-2]} "
                 f"[{i + 1:04d}:{format_time(time.perf_counter() - time0)}] "
                 f"train[ loss={train_loss:.3f} "
                 f"min-median-max={min_median_max[0]:.2f} {min_median_max[1]:.2f} {min_median_max[2]:.2f} ] "
-                f"test[ "
-                f"tn={epoch_avg_confusion[0, 0]:.2f} tp={epoch_avg_confusion[1, 1]:.2f} "
-                f"fn={epoch_avg_confusion[1, 0]:.2f} fp={epoch_avg_confusion[0, 1]:.2f} ] "
+                f"test[ dice={dice_txt} ] "
                 f"time[ "
                 f"S{format_time(t1 - t0)}+"
                 f"U{format_time(t2 - t1)}+"
@@ -209,6 +214,7 @@ def main():
             "time_update": t2 - t1,
             "time_eval": t3 - t2,
             "confusion_matrices": confusion_matrices,
+            "dice": dice,
         }
 
         if i % 500 == 0:
