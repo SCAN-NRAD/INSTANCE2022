@@ -192,11 +192,13 @@ def main():
             train_loss.block_until_ready()
 
             t2 = time.perf_counter()
-            img, lab, zooms = test_set[i % 10]
-            test_pred = apply_model(w, img, zooms)
+            if i % 3 == 0:
+                img, lab, zooms = test_set[(i // 3) % 10]
+                test_pred = apply_model(w, img, zooms)
+                confusion_matrices.append(confusion_matrix(un(lab).flatten() > 0.0, un(test_pred).flatten() > 0.0))
+
             t3 = time.perf_counter()
-            confusion_matrices.append(confusion_matrix(un(lab).flatten() > 0.0, un(test_pred).flatten() > 0.0))
-            epoch_avg_confusion = np.mean(confusion_matrices[-10:], axis=0)
+            epoch_avg_confusion = np.mean(confusion_matrices[-len(test_set) :], axis=0)
             epoch_avg_confusion = epoch_avg_confusion / np.sum(epoch_avg_confusion)
 
             min_median_max = np.min(train_pred), np.median(train_pred), np.max(train_pred)
