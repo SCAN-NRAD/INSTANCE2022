@@ -131,9 +131,9 @@ def main():
 
     collect_metrics = np.array(collect_metrics)
 
-    print(f"DSC = {collect_metrics[:,0]}")
-    print(f"HD = {collect_metrics[:,1]}")
-    print(f"RVD = {collect_metrics[:,2]}")
+    print(f"DSC = {', '.join(map(repr, collect_metrics[:,0]))}")
+    print(f"HD = {', '.join(map(repr, collect_metrics[:,1]))}")
+    print(f"RVD = {', '.join(map(repr, collect_metrics[:,2]))}")
 
     avg_metrics = np.mean(collect_metrics, axis=0)
     print(f"Average DSC: {avg_metrics[0]}", flush=True)
