@@ -219,8 +219,7 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
         "time_update": t2 - t1,
         "time_eval": t3 - t2,
         "confusion_matrices": c,
-        "dice": dice,
-    }
+    }.update({f"dice_{91 + i}": d for i, d in enumerate(dice)})
 
     if i % 500 == 0:
         with open(f"{wandb.run.dir}/w.pkl", "wb") as f:
