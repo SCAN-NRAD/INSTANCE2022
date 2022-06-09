@@ -7,12 +7,11 @@ from functools import partial
 import haiku as hk
 import numpy as np
 import optax
-from sklearn.metrics import confusion_matrix
 
 import jax
 import jax.numpy as jnp
 import wandb
-from functions import cross_entropy, format_time, load_miccai22, random_sample, unpad
+from functions import confusion_matrix, cross_entropy, format_time, load_miccai22, random_sample, unpad
 from jax.config import config
 from model import unet_with_groups
 
@@ -166,7 +165,7 @@ def main():
         if i % 3 == 0:
             img, lab, zooms = test_set[(i // 3) % 10]
             test_pred = apply_model(w, img, zooms)
-            confusion_matrices.append(confusion_matrix(un(lab).flatten() > 0.0, un(test_pred).flatten() > 0.0))
+            confusion_matrices.append(confusion_matrix(un(lab), un(test_pred)))
 
         t3 = time.perf_counter()
         epoch_avg_confusion = np.mean(confusion_matrices[-len(test_set) :], axis=0)

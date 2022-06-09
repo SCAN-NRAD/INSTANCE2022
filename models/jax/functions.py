@@ -73,3 +73,26 @@ def cross_entropy(p: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
     assert p.shape == y.shape
     zero = jnp.zeros_like(p)
     return logsumexp(jnp.stack([zero, -p * y]), axis=0)
+
+
+@jax.jit
+def confusion_matrix(y: jnp.ndarray, p: jnp.ndarray) -> jnp.ndarray:
+    r"""Confusion matrix.
+
+    Args:
+        y: labels (-1 or 1)
+        p: predictions (logits)
+
+    Returns:
+        confusion matrix
+        [tn, fp]
+        [fn, tp]
+    """
+    assert y.shape == p.shape
+    y = y > 0.0
+    p = p > 0.0
+    tp = jnp.sum(y * p)
+    tn = jnp.sum((1 - y) * (1 - p))
+    fp = jnp.sum((1 - y) * p)
+    fn = jnp.sum(y * (1 - p))
+    return jnp.array([[tn, fp], [fn, tp]])
