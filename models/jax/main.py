@@ -35,7 +35,6 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description="Train a model")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
-    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--data", type=str, default="../../train_2", help="Path to data")
     parser.add_argument("--logdir", type=str, default=".", help="Path to log directory")
@@ -64,6 +63,7 @@ def main():
     )
     parser.add_argument("--min_zoom", type=float, default=0.36, help="Minimum zoom")
     parser.add_argument("--downsampling", type=float, default=2.0, help="Downsampling factor")
+    parser.add_argument("--conv_diameter", type=float, default=5.0, help="Diameter of the convolution kernel")
     parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
     args = parser.parse_args()
 
