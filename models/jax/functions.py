@@ -110,7 +110,8 @@ def init_train_loop(args, w, opt_state) -> TrainState:
     time0 = time.perf_counter()
     sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
 
-    train_set = [load_miccai22(args.data, i) for i in range(1, 90 + 1)]
+    n = 1 if args.dummy else 90
+    train_set = [load_miccai22(args.data, i) for i in range(1, n + 1)]
 
     test_set = []
     for i in range(91, 100 + 1):

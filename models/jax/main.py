@@ -54,7 +54,13 @@ def main():
         "--num_radial_basis_sh2", type=int, default=2, help="Number of radial basis functions for spherical harmonics 2"
     )
     parser.add_argument(
+        "--num_radial_basis_sh3", type=int, default=0, help="Number of radial basis functions for spherical harmonics 3"
+    )
+    parser.add_argument(
         "--relative_start_sh2", type=float, default=0.0, help="Relative start of radial basis for spherical harmonics 2"
+    )
+    parser.add_argument(
+        "--relative_start_sh3", type=float, default=0.0, help="Relative start of radial basis for spherical harmonics 3"
     )
     parser.add_argument("--min_zoom", type=float, default=0.36, help="Minimum zoom")
     parser.add_argument("--downsampling", type=float, default=2.0, help="Downsampling factor")

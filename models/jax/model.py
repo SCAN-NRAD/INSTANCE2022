@@ -114,11 +114,23 @@ def unet_with_groups(args):
         Returns:
             jnp.ndarray: output data of shape ``(x, y, z)``
         """
-        irreps_sh = e3nn.Irreps("0e + 1o + 2e" if args.equivariance == "E3" else "0e + 1e + 2e")
+        num_radial_basis = {
+            0: args.num_radial_basis_sh0,
+            1: args.num_radial_basis_sh1,
+            2: args.num_radial_basis_sh2,
+            3: args.num_radial_basis_sh3,
+        }
+        irreps_sh = e3nn.Irreps("0e + 1o + 2e + 3o" if args.equivariance == "E3" else "0e + 1e + 2e + 3e")
+        irreps_sh = e3nn.Irreps([mul_ir for mul_ir in irreps_sh if num_radial_basis[mul_ir.ir.l] > 0])
         kw = dict(
             irreps_sh=irreps_sh,
-            num_radial_basis={0: args.num_radial_basis_sh0, 1: args.num_radial_basis_sh1, 2: args.num_radial_basis_sh2},
-            relative_starts={0: 0.0, 1: 0.0, 2: args.relative_start_sh2},
+            num_radial_basis=num_radial_basis,
+            relative_starts={
+                0: 0.0,
+                1: 0.0,
+                2: args.relative_start_sh2,
+                3: args.relative_start_sh3,
+            },
         )
 
         def cbg(vox: Voxels, mul: float, *, radius: float, filter=None, normalize=True) -> Voxels:
