@@ -43,24 +43,19 @@ def main():
     parser.add_argument("--pretrained", type=str, default=None, help="Path to npy file")
     parser.add_argument("--equivariance", type=str, default="E3", help="Equivariance group")
     parser.add_argument("--width", type=int, default=5, help="Width of the network")
-    parser.add_argument(
-        "--num_radial_basis_sh0", type=int, default=2, help="Number of radial basis functions for spherical harmonics 0"
-    )
-    parser.add_argument(
-        "--num_radial_basis_sh1", type=int, default=2, help="Number of radial basis functions for spherical harmonics 1"
-    )
-    parser.add_argument(
-        "--num_radial_basis_sh2", type=int, default=2, help="Number of radial basis functions for spherical harmonics 2"
-    )
-    parser.add_argument(
-        "--num_radial_basis_sh3", type=int, default=0, help="Number of radial basis functions for spherical harmonics 3"
-    )
-    parser.add_argument(
-        "--relative_start_sh2", type=float, default=0.0, help="Relative start of radial basis for spherical harmonics 2"
-    )
-    parser.add_argument(
-        "--relative_start_sh3", type=float, default=0.0, help="Relative start of radial basis for spherical harmonics 3"
-    )
+    for l in range(4 + 1):
+        parser.add_argument(
+            f"--num_radial_basis_sh{l}",
+            type=int,
+            default=2 if l <= 2 else 0,
+            help=f"Number of radial basis functions for spherical harmonics {l}",
+        )
+        parser.add_argument(
+            f"--relative_start_sh{l}",
+            type=float,
+            default=0.0,
+            help=f"Relative start of radial basis for spherical harmonics {l}",
+        )
     parser.add_argument("--min_zoom", type=float, default=0.36, help="Minimum zoom")
     parser.add_argument("--downsampling", type=float, default=2.0, help="Downsampling factor")
     parser.add_argument("--conv_diameter", type=float, default=5.0, help="Diameter of the convolution kernel")

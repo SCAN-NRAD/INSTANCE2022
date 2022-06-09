@@ -119,17 +119,19 @@ def unet_with_groups(args):
             1: args.num_radial_basis_sh1,
             2: args.num_radial_basis_sh2,
             3: args.num_radial_basis_sh3,
+            4: args.num_radial_basis_sh4,
         }
-        irreps_sh = e3nn.Irreps("0e + 1o + 2e + 3o" if args.equivariance == "E3" else "0e + 1e + 2e + 3e")
+        irreps_sh = e3nn.Irreps.spherical_harmonics(4, p=-1 if args.equivariance == "E3" else 1)
         irreps_sh = e3nn.Irreps([mul_ir for mul_ir in irreps_sh if num_radial_basis[mul_ir.ir.l] > 0])
         kw = dict(
             irreps_sh=irreps_sh,
             num_radial_basis=num_radial_basis,
             relative_starts={
-                0: 0.0,
-                1: 0.0,
+                0: args.relative_start_sh0,
+                1: args.relative_start_sh1,
                 2: args.relative_start_sh2,
                 3: args.relative_start_sh3,
+                4: args.relative_start_sh4,
             },
         )
 
