@@ -44,16 +44,16 @@ def random_sample(x: np.ndarray, y: np.ndarray, target_sizes: Tuple[int, int, in
 
 def format_time(seconds: float) -> str:
     if seconds < 1:
-        return f"{1000 * seconds:.0f}ms"
+        return f"{1000 * seconds:03.0f}ms"
     if seconds < 60:
-        return f"{seconds:.2f}s"
+        return f"{seconds:05.2f}s"
     minutes = math.floor(seconds / 60)
     seconds = seconds - 60 * minutes
     if minutes < 60:
-        return f"{minutes:.0f}min{seconds:.2f}s"
+        return f"{minutes:02.0f}min{seconds:02.0f}s"
     hours = math.floor(minutes / 60)
     minutes = minutes - 60 * hours
-    return f"{hours:.0f}h{minutes:.0f}min"
+    return f"{hours:.0f}h{minutes:02.0f}min"
 
 
 def unpad(x, pads):
