@@ -165,10 +165,11 @@ def main():
         if i % 3 == 0:
             img, lab, zooms = test_set[(i // 3) % 10]
             test_pred = apply_model(w, img, zooms)
-            confusion_matrices.append(confusion_matrix(un(lab), un(test_pred)))
+            confusion_matrices.append(np.array(confusion_matrix(un(lab), un(test_pred))))
+            confusion_matrices = confusion_matrices[-len(test_set) :]
 
         t3 = time.perf_counter()
-        epoch_avg_confusion = np.mean(confusion_matrices[-len(test_set) :], axis=0)
+        epoch_avg_confusion = np.mean(confusion_matrices, axis=0)
         epoch_avg_confusion = epoch_avg_confusion / np.sum(epoch_avg_confusion)
 
         min_median_max = np.min(train_pred), np.median(train_pred), np.max(train_pred)
