@@ -205,6 +205,8 @@ def main():
             "min_pred": min_median_max[0],
             "median_pred": min_median_max[1],
             "max_pred": min_median_max[2],
+            "time_update": t2 - t1,
+            "time_eval": t3 - t2,
         }
 
         if i % 500 == 0:
