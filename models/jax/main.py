@@ -115,7 +115,6 @@ def main():
     # Init
     print("Init statistics...", flush=True)
     time0 = time.perf_counter()
-    confusion_matrices = []
     sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
 
     train_set = [load_miccai22(args.data, i) for i in range(1, 90 + 1)]
@@ -131,6 +130,8 @@ def main():
         img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         test_set.append((img, lab, zooms))
+
+    confusion_matrices = np.zeros((len(test_set), 2, 2))
 
     t4 = time.perf_counter()
     # Init
@@ -163,10 +164,10 @@ def main():
 
         t2 = time.perf_counter()
         if i % 3 == 0:
-            img, lab, zooms = test_set[(i // 3) % 10]
+            j = (i // 3) % 10
+            img, lab, zooms = test_set[j]
             test_pred = apply_model(w, img, zooms)
-            confusion_matrices.append(np.array(confusion_matrix(un(lab), un(test_pred))))
-            confusion_matrices = confusion_matrices[-len(test_set) :]
+            confusion_matrices[j] = np.array(confusion_matrix(un(lab), un(test_pred)))
 
         t3 = time.perf_counter()
         epoch_avg_confusion = np.mean(confusion_matrices, axis=0)
@@ -207,6 +208,7 @@ def main():
             "max_pred": min_median_max[2],
             "time_update": t2 - t1,
             "time_eval": t3 - t2,
+            "confusion_matrices": confusion_matrices,
         }
 
         if i % 500 == 0:
