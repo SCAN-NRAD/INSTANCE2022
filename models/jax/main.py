@@ -148,7 +148,7 @@ def main():
             for trial in range(10):
                 try:
                     with open(f"{wandb.run.dir}/main.py", "r") as f:
-                        code = dedent(f.read().split("# Loop")[3])
+                        code = dedent(f.read().split("# Loop")[2])
                     if code != last_code:
                         with open(f"{wandb.run.dir}/main.py", "r") as f:
                             init_code = dedent(f.read().split("# Init")[1])
