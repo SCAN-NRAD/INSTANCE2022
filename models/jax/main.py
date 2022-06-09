@@ -68,7 +68,7 @@ def main():
     else:
         print("Initializing model...", flush=True)
         t = time.perf_counter()
-        w = model.init(jax.random.PRNGKey(args.seed_init), img[:16, :16, :16], zooms)
+        w = model.init(jax.random.PRNGKey(args.seed_init), img[:100, :100, :25], zooms)
         print(f"Initialized model in {format_time(time.perf_counter() - t)}", flush=True)
 
     opt_state = optax.adam(args.lr).init(w)
