@@ -1,23 +1,33 @@
 import argparse
+import importlib
 import pickle
 import shutil
+import sys
 import time
 from functools import partial
 
 import haiku as hk
 import numpy as np
 import optax
+import hashlib
 
 import jax
 import jax.numpy as jnp
 import wandb
-from functions import confusion_matrix, cross_entropy, format_time, load_miccai22, random_sample, unpad
 from jax.config import config
 from model import unet_with_groups
 
 config.update("jax_debug_nans", True)
 config.update("jax_debug_infs", True)
 np.set_printoptions(precision=3, suppress=True)
+
+
+def hash_file(file_path: str) -> str:
+    sha256 = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            sha256.update(chunk)
+    return sha256.hexdigest()
 
 
 def main():
@@ -45,13 +55,15 @@ def main():
     shutil.copy("./model.py", f"{wandb.run.dir}/model.py")
     shutil.copy("./functions.py", f"{wandb.run.dir}/functions.py")
     shutil.copy("./evaluate.py", f"{wandb.run.dir}/evaluate.py")
+    sys.path.insert(0, wandb.run.dir)
+    import functions
 
     with open(f"{wandb.run.dir}/args.pkl", "wb") as f:
         pickle.dump(args, f)
 
     # Load data
     print("Loading data...", flush=True)
-    img, lab, zooms = load_miccai22(args.data, 1)
+    img, lab, zooms = functions.load_miccai22(args.data, 1)
 
     # Create model
     if args.dummy:
@@ -68,12 +80,10 @@ def main():
         print("Initializing model...", flush=True)
         t = time.perf_counter()
         w = model.init(jax.random.PRNGKey(args.seed_init), img[:100, :100, :25], zooms)
-        print(f"Initialized model in {format_time(time.perf_counter() - t)}", flush=True)
-
-    opt_state = optax.adam(args.lr).init(w)
+        print(f"Initialized model in {functions.format_time(time.perf_counter() - t)}", flush=True)
 
     def un(img):
-        return unpad(img, (16, 16, 1))
+        return functions.unpad(img, (16, 16, 1))
 
     @partial(jax.jit, static_argnums=(2,))
     def apply_model(w, x, zooms):
@@ -103,7 +113,7 @@ def main():
 
         def h(w, x, y):
             p = model.apply(w, x, zooms)
-            return jnp.mean(cross_entropy(un(p), un(y))), p
+            return jnp.mean(functions.cross_entropy(un(p), un(y))), p
 
         grad_fn = jax.value_and_grad(h, has_aux=True)
         (loss, pred), grads = grad_fn(w, x, y)
@@ -112,120 +122,21 @@ def main():
         w = optax.apply_updates(w, updates)
         return w, opt_state, loss, pred
 
-    # Init
-    print("Init statistics...", flush=True)
-    time0 = time.perf_counter()
-    sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
+    opt_state = optax.adam(args.lr).init(w)
 
-    train_set = [load_miccai22(args.data, i) for i in range(1, 90 + 1)]
-
-    test_set = []
-    for i in range(91, 100 + 1):
-        img, lab, zooms = load_miccai22(args.data, i)  # test data
-        zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
-        center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
-        start = np.maximum(center_of_mass - np.array(sample_size) // 2, 0)
-        end = np.minimum(start + np.array(sample_size), np.array(img.shape))
-        start = end - np.array(sample_size)
-        img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
-        lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
-        test_set.append((img, lab, zooms))
-
-    confusion_matrices = np.zeros((len(test_set), 2, 2))
-
-    t4 = time.perf_counter()
-    # Init
+    hash = hash_file(f"{wandb.run.dir}/functions.py")
+    state = functions.init_train_loop(args, w, opt_state)
 
     for i in range(99_999_999):
-        # Loop
-        t0 = time.perf_counter()
-        t_extra = t0 - t4
 
-        if i == 120:
-            jax.profiler.start_trace(wandb.run.dir)
+        # Reload the loop function if the code has changed
+        new_hash = hash_file(f"{wandb.run.dir}/functions.py")
+        if new_hash != hash:
+            hash = new_hash
+            importlib.reload(functions)
+            state = functions.init_train_loop(args, w, opt_state)
 
-        img, lab, zooms = train_set[i % len(train_set)]
-
-        # regroup zooms and sizes by rounding and taking subsets of the volume
-        zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
-        if np.random.rand() < 0.5:
-            while True:
-                x, y = random_sample(img, lab, sample_size)
-                if np.any(un(y) == 1):
-                    img, lab = x, y
-                    break
-        else:
-            img, lab = random_sample(img, lab, sample_size)
-
-        t1 = time.perf_counter()
-
-        w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, args.lr)
-        train_loss.block_until_ready()
-
-        t2 = time.perf_counter()
-        if i % 3 == 0:
-            j = (i // 3) % 10
-            img, lab, zooms = test_set[j]
-            test_pred = apply_model(w, img, zooms)
-            confusion_matrices[j] = np.array(confusion_matrix(un(lab), un(test_pred)))
-
-        t3 = time.perf_counter()
-        epoch_avg_confusion = np.mean(confusion_matrices, axis=0)
-        epoch_avg_confusion = epoch_avg_confusion / np.sum(epoch_avg_confusion)
-
-        dice = (
-            2
-            * confusion_matrices[:, 1, 1]
-            / (2 * confusion_matrices[:, 1, 1] + confusion_matrices[:, 1, 0] + confusion_matrices[:, 0, 1])
-        )
-
-        min_median_max = np.min(train_pred), np.median(train_pred), np.max(train_pred)
-        t4 = time.perf_counter()
-
-        dice_txt = ",".join(f"{d:.2f}" for d in dice)
-        print(
-            (
-                f"{wandb.run.dir.split('/')[-2]} "
-                f"[{i + 1:04d}:{format_time(time.perf_counter() - time0)}] "
-                f"train[ loss={train_loss:.3f} "
-                f"min-median-max={min_median_max[0]:.2f} {min_median_max[1]:.2f} {min_median_max[2]:.2f} ] "
-                f"test[ dice={dice_txt} ] "
-                f"time[ "
-                f"S{format_time(t1 - t0)}+"
-                f"U{format_time(t2 - t1)}+"
-                f"E{format_time(t3 - t2)}+"
-                f"C{format_time(t4 - t3)}+"
-                f"EX{format_time(t_extra)} ]"
-            ),
-            flush=True,
-        )
-
-        state = {
-            "iteration": i,
-            "_runtime": time.perf_counter() - time0,
-            "train_loss": train_loss,
-            "true_negatives": epoch_avg_confusion[0, 0],
-            "true_positives": epoch_avg_confusion[1, 1],
-            "false_negatives": epoch_avg_confusion[1, 0],
-            "false_positives": epoch_avg_confusion[0, 1],
-            "min_pred": min_median_max[0],
-            "median_pred": min_median_max[1],
-            "max_pred": min_median_max[2],
-            "time_update": t2 - t1,
-            "time_eval": t3 - t2,
-            "confusion_matrices": confusion_matrices,
-            "dice": dice,
-        }
-
-        if i % 500 == 0:
-            with open(f"{wandb.run.dir}/w.pkl", "wb") as f:
-                pickle.dump(w, f)
-
-        if i == 120:
-            jax.profiler.stop_trace()
-
-        wandb.log(state)
-        # Loop
+        state, w, opt_state = functions.train_loop(args, state, i, w, opt_state, un, update, apply_model)
 
 
 if __name__ == "__main__":
