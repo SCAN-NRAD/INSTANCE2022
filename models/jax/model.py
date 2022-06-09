@@ -115,7 +115,11 @@ def unet_with_groups(args):
             jnp.ndarray: output data of shape ``(x, y, z)``
         """
         irreps_sh = e3nn.Irreps("0e + 1o + 2e" if args.equivariance == "E3" else "0e + 1e + 2e")
-        kw = dict(irreps_sh=irreps_sh, num_radial_basis=args.num_radial_basis)
+        kw = dict(
+            irreps_sh=irreps_sh,
+            num_radial_basis={0: args.num_radial_basis_sh0, 1: args.num_radial_basis_sh1, 2: args.num_radial_basis_sh2},
+            relative_starts={0: 0.0, 1: 0.0, 2: args.relative_start_sh2},
+        )
 
         def cbg(vox: Voxels, mul: float, *, radius: float, filter=None, normalize=True) -> Voxels:
             mul = round(mul)
@@ -163,6 +167,7 @@ def unet_with_groups(args):
             assert len(vox1.data.shape) == 1 + 3 + 1
             assert len(vox2.data.shape) == 1 + 3 + 1
             assert vox1.zooms == vox2.zooms
+            assert vox1.data.irreps == vox2.data.irreps
             return Voxels(zooms=vox1.zooms, data=e3nn.IrrepsData.cat([vox1.data, vox2.data], axis=-1))
 
         def upcat(low_vox: Voxels, high_vox: Voxels) -> Voxels:
@@ -203,6 +208,17 @@ def unet_with_groups(args):
         min_zoom *= args.downsampling
         x_a = x
         x = down(x, min_zoom=min_zoom)
+
+        if args.dummy:
+            x = cbg(x, mul, filter=["0e", "0o", "1e", "1o"], radius=2.5 * min_zoom)
+            x = upcat(x, x_a)
+            min_zoom /= args.downsampling
+            x = group_conv(x, irreps="0e", mul=round(mul), radius=2.5 * min_zoom)
+            x = x.data.repeat_irreps_by_last_axis()  # [batch, x, y, z, irreps]
+            x = bn(x)
+            x = g(x)
+            x = n_vmap(1 + 3, e3nn.Linear("0e"))(x)
+            return x.contiguous[0, :, :, :, 0]
 
         # Block B
         print_stats("Block B", x)

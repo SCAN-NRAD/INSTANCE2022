@@ -44,7 +44,18 @@ def main():
     parser.add_argument("--pretrained", type=str, default=None, help="Path to npy file")
     parser.add_argument("--equivariance", type=str, default="E3", help="Equivariance group")
     parser.add_argument("--width", type=int, default=5, help="Width of the network")
-    parser.add_argument("--num_radial_basis", type=int, default=2, help="Number of radial basis functions")
+    parser.add_argument(
+        "--num_radial_basis_sh0", type=int, default=2, help="Number of radial basis functions for spherical harmonics 0"
+    )
+    parser.add_argument(
+        "--num_radial_basis_sh1", type=int, default=2, help="Number of radial basis functions for spherical harmonics 1"
+    )
+    parser.add_argument(
+        "--num_radial_basis_sh2", type=int, default=2, help="Number of radial basis functions for spherical harmonics 2"
+    )
+    parser.add_argument(
+        "--relative_start_sh2", type=float, default=0.0, help="Relative start of radial basis for spherical harmonics 2"
+    )
     parser.add_argument("--min_zoom", type=float, default=0.36, help="Minimum zoom")
     parser.add_argument("--downsampling", type=float, default=2.0, help="Downsampling factor")
     parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
@@ -66,12 +77,7 @@ def main():
     img, lab, zooms = functions.load_miccai22(args.data, 1)
 
     # Create model
-    if args.dummy:
-        model = hk.without_apply_rng(
-            hk.transform(lambda x, zooms: jax.vmap(jax.vmap(jax.vmap(hk.Linear(1))))(x[..., None])[..., 0])
-        )
-    else:
-        model = hk.without_apply_rng(hk.transform(unet_with_groups(args)))
+    model = hk.without_apply_rng(hk.transform(unet_with_groups(args)))
 
     if args.pretrained is not None:
         print("Loading pretrained parameters...", flush=True)

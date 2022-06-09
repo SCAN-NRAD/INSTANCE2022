@@ -164,9 +164,6 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
     w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, args.lr)
     train_loss.block_until_ready()
 
-    if args.dummy:
-        time.sleep(0.5)
-
     t2 = time.perf_counter()
     c = state.confusion_matrices
     if i % 3 == 0:
