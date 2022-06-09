@@ -129,6 +129,8 @@ def main():
 
         collect_metrics.append([DSC, HD, RVD])
 
+    collect_metrics = np.array(collect_metrics)
+
     print(f"DSC = {collect_metrics[:,0]}")
     print(f"HD = {collect_metrics[:,1]}")
     print(f"RVD = {collect_metrics[:,2]}")
