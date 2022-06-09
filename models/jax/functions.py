@@ -187,7 +187,7 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
     state.losses[i % len(state.train_set)] = train_loss
     t4 = time.perf_counter()
 
-    dice_txt = ",".join(f"{100 * d:.0f}" for d in dice)
+    dice_txt = ",".join(f"{100 * d:02.0f}" for d in dice)
     print(
         (
             f"{wandb.run.dir.split('/')[-2]} "
