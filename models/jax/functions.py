@@ -209,6 +209,7 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
         "iteration": i,
         "_runtime": time.perf_counter() - state.time0,
         "train_loss": train_loss,
+        "avg_train_loss": np.mean(state.losses),
         "true_negatives": epoch_avg_confusion[0, 0],
         "true_positives": epoch_avg_confusion[1, 1],
         "false_negatives": epoch_avg_confusion[1, 0],
