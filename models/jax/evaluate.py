@@ -52,7 +52,7 @@ def main():
     collect_metrics = []
 
     for idx in args.indices:
-        print(f"Evaluating run {idx}", end=" ", flush=True)
+        print(f"Evaluating run {idx}", flush=True)
         img, _, zooms = load_miccai22(args.data, idx)
         zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
 
@@ -94,7 +94,7 @@ def main():
                         k + pads[2] : k + size[2] - pads[2],
                     ] += gaussian
 
-                    print(".", end="", flush=True)
+                    print(i, j, k, flush=True)
         print(flush=True)
 
         negative_value = -10.0
@@ -132,9 +132,9 @@ def main():
 
     collect_metrics = np.array(collect_metrics)
 
-    print(f"DSC = {', '.join(map(repr, collect_metrics[:,0]))}")
-    print(f"HD = {', '.join(map(repr, collect_metrics[:,1]))}")
-    print(f"RVD = {', '.join(map(repr, collect_metrics[:,2]))}")
+    print(f"DSC (dice score):                 {', '.join(map(repr, collect_metrics[:,0]))}")
+    print(f"HD (hausdorff distance):          {', '.join(map(repr, collect_metrics[:,1]))}")
+    print(f"RVD (relative volume difference): {', '.join(map(repr, collect_metrics[:,2]))}")
 
     avg_metrics = np.mean(collect_metrics, axis=0)
     print(f"Average DSC: {avg_metrics[0]}", flush=True)
