@@ -166,6 +166,9 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
     train_loss.block_until_ready()
 
     t2 = time.perf_counter()
+    c = confusion_matrix(un(lab), un(train_pred))
+    train_dice = 2 * c[1, 1] / (2 * c[1, 1] + c[1, 0] + c[0, 1])
+
     c = state.confusion_matrices
     if i % 3 == 0:
         j = (i // 3) % 10
@@ -191,7 +194,7 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
             f"{wandb.run.dir.split('/')[-2]} "
             f"[{i + 1:04d}:{format_time(time.perf_counter() - state.time0)}] "
             f"train[ loss={np.mean(state.losses):.4f} "
-            f"mi-me-ma={min_median_max[0]:.1f} {min_median_max[1]:.1f} {min_median_max[2]:.1f} ] "
+            f"dice={100 * train_dice:02.0f} ] "
             f"test[ dice={dice_txt} ] "
             f"time[ "
             f"S{format_time(t1 - t0)}+"
