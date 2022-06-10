@@ -62,7 +62,7 @@ def main():
     parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
     args = parser.parse_args()
 
-    wandb.init(project="miccai22", name=args.name, dir=args.logdir, config=args)
+    wandb.init(project="miccai22", entity="instance2022", name=args.name, dir=args.logdir, config=args)
     shutil.copy(__file__, f"{wandb.run.dir}/main.py")
     shutil.copy("./model.py", f"{wandb.run.dir}/model.py")
     shutil.copy("./functions.py", f"{wandb.run.dir}/functions.py")
