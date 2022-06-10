@@ -32,7 +32,7 @@ def main():
     parser.add_argument("--indices", nargs="+", type=int, required=True, help="Indices of the runs to evaluate")
     args = parser.parse_args()
 
-    print(args.path)
+    print(args.path, flush=True)
     sys.path.insert(0, args.path)
     import model  # noqa: F401
     from functions import load_miccai22, unpad  # noqa: F401
@@ -40,6 +40,7 @@ def main():
     # Load model args
     with open(f"{args.path}/args.pkl", "rb") as f:
         train_args = pickle.load(f)
+    print(train_args, flush=True)
 
     @partial(jax.jit, static_argnums=(2,))
     def apply(w, x, zooms):
