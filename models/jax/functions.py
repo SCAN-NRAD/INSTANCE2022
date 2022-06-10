@@ -167,7 +167,8 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
 
     t2 = time.perf_counter()
     c = np.array(confusion_matrix(un(lab), un(train_pred)))
-    train_dice = 2 * c[1, 1] / (2 * c[1, 1] + c[1, 0] + c[0, 1])
+    with np.errstate(invalid="ignore"):
+        train_dice = 2 * c[1, 1] / (2 * c[1, 1] + c[1, 0] + c[0, 1])
 
     c = state.confusion_matrices
     if i % 3 == 0:
