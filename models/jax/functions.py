@@ -27,6 +27,10 @@ def load_miccai22(path: str, i: int) -> Tuple[np.ndarray, np.ndarray, Tuple[floa
     image = 2.5 * np.clip(image / 80.0, a_min=0.0, a_max=1.0)
     image = image.astype(np.float32)
 
+    # -50 to 220
+
+    # 0 to 1000
+
     label = 2.0 * label - 1.0
     label = label.astype(np.float32)
     return image, label, zooms
@@ -152,13 +156,19 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
     # regroup zooms and sizes by rounding and taking subsets of the volume
     zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
     if np.random.rand() < 0.5:
+        # avoid patch without label
         while True:
             x, y = random_sample(img, lab, state.sample_size)
             if np.any(un(y) == 1):
                 img, lab = x, y
                 break
     else:
-        img, lab = random_sample(img, lab, state.sample_size)
+        # avoid patch full of air
+        while True:
+            x, y = random_sample(img, lab, state.sample_size)
+            if np.any(x > 0.0):
+                img, lab = x, y
+                break
 
     t1 = time.perf_counter()
 
