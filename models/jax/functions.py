@@ -170,7 +170,8 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
 
     t1 = time.perf_counter()
 
-    w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, args.lr)
+    lr = args.lr * 0.1 ** math.floor(i / 40_000)
+    w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr)
     train_loss.block_until_ready()
 
     t2 = time.perf_counter()
