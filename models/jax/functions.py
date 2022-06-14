@@ -24,12 +24,10 @@ def load_miccai22(path: str, i: int) -> Tuple[np.ndarray, np.ndarray, Tuple[floa
     image = image.get_fdata()
     label = label.get_fdata()
 
-    image = 2.5 * np.clip(image / 80.0, a_min=0.0, a_max=1.0)
-    image = image.astype(np.float32)
-
-    # -50 to 220
-
-    # 0 to 1000
+    bone = 0.005 * np.clip(image, a_min=0.0, a_max=1000.0).astype(np.float32)
+    range1 = 0.03 * np.clip(image, a_min=0.0, a_max=80.0).astype(np.float32)
+    range2 = 0.013 * np.clip(image, a_min=-50.0, a_max=220.0).astype(np.float32)
+    image = np.stack([bone, range1, range2], axis=-1)
 
     label = 2.0 * label - 1.0
     label = label.astype(np.float32)
@@ -44,7 +42,7 @@ def random_slice(size: int, target_size: int) -> slice:
 
 
 def random_sample(x: np.ndarray, y: np.ndarray, target_sizes: Tuple[int, int, int]) -> Tuple[np.ndarray, np.ndarray]:
-    slices = jax.tree_map(random_slice, x.shape, target_sizes)
+    slices = jax.tree_map(random_slice, x.shape[:3], target_sizes)
     sx = x[slices[0], slices[1], slices[2]]
     sy = y[slices[0], slices[1], slices[2]]
     return sx, sy
@@ -123,7 +121,7 @@ def init_train_loop(args, w, opt_state) -> TrainState:
         zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
         center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
         start = np.maximum(center_of_mass - np.array(sample_size) // 2, 0)
-        end = np.minimum(start + np.array(sample_size), np.array(img.shape))
+        end = np.minimum(start + np.array(sample_size), np.array(img.shape[:3]))
         start = end - np.array(sample_size)
         img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]

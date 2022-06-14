@@ -198,9 +198,9 @@ def unet_with_groups(args):
 
         mul = args.width  # default is 5
 
-        assert len(input.shape) == 3
+        assert input.ndim == 3 + 1
         x = Voxels(
-            zooms=zooms, data=e3nn.IrrepsData.from_contiguous("0e", input[None, :, :, :, None, None])
+            zooms=zooms, data=e3nn.IrrepsData.from_contiguous("0e", input[None, :, :, :, :, None])
         )  # Voxel of shape (batch, x, y, z, channel, irreps)
 
         min_zoom = args.min_zoom

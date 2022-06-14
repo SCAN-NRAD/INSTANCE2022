@@ -115,7 +115,7 @@ def main():
                 loss: Loss value.
                 pred: Predicted data ``(x, y, z)``.
         """
-        assert x.ndim == 3
+        assert x.ndim == 3 + 1
         assert y.ndim == 3
 
         def h(w, x, y):
