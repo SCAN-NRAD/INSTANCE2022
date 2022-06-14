@@ -53,7 +53,7 @@ def main():
 
     for idx in args.indices:
         print(f"Evaluating run {idx}", flush=True)
-        img, _, zooms = load_miccai22(args.data, idx)
+        img, lab, zooms = load_miccai22(args.data, idx)
         zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
 
         size = (100, 100, 25)
@@ -71,8 +71,8 @@ def main():
         )
         gaussian = np.exp(-np.linalg.norm(pos, axis=-1) ** 2)
 
-        sum = np.zeros_like(img)
-        num = np.zeros_like(img)
+        sum = np.zeros_like(lab)
+        num = np.zeros_like(lab)
 
         for i in ite(img.shape[0], size[0], pads[0], overlap):
             for j in ite(img.shape[1], size[1], pads[1], overlap):
