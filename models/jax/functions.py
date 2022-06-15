@@ -118,8 +118,8 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
         train_idx = [1, 2]
         test_idx = [91, 92]
     else:
-        train_idx = list(range(1, 90 + 1))
-        test_idx = list(range(91, 100 + 1))
+        train_idx = list(range(args.trainset_start, args.trainset_stop + 1))
+        test_idx = [i for i in list(range(1, 100 + 1)) if i not in train_idx]
 
     train_set = [load_miccai22(args.data, i) for i in train_idx]
 

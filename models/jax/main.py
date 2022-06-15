@@ -40,6 +40,8 @@ def main():
     parser.add_argument("--logdir", type=str, default=".", help="Path to log directory")
     parser.add_argument("--seed_init", type=int, default=1, help="Random seed")
     parser.add_argument("--name", type=str, required=True, help="Name of the run")
+    parser.add_argument("--trainset_start", type=int, default=1, help="Start index of training set")
+    parser.add_argument("--trainset_stop", type=int, default=90, help="Stop index of training set")
     parser.add_argument("--pretrained", type=str, default=None, help="Path to npy file")
     parser.add_argument("--equivariance", type=str, default="E3", help="Equivariance group")
     parser.add_argument("--width", type=int, default=5, help="Width of the network")
