@@ -31,7 +31,7 @@ def hash_file(file_path: str) -> str:
 
 
 def main():
-    print("main", flush=True)
+    print("Welcome", flush=True)
     # Parse arguments
     parser = argparse.ArgumentParser(description="Train a model")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
@@ -101,7 +101,7 @@ def main():
 
     @partial(jax.jit, static_argnums=(2,))
     def apply_model(w, x, zooms):
-        return jax.vmap(model.apply, (None, 0, None), 0)(w, x, zooms)
+        return model.apply(w, x, zooms)
 
     @partial(jax.jit, static_argnums=(4,))
     def update(w, opt_state, x, y, zooms, lr):
@@ -140,6 +140,7 @@ def main():
 
     hash = hash_file(f"{wandb.run.dir}/functions.py")
     state = functions.init_train_loop(args, None, 0, w, opt_state)
+    print("Start main loop...", flush=True)
 
     for step in range(99_999_999):
 
@@ -149,6 +150,7 @@ def main():
             hash = new_hash
             importlib.reload(functions)
             state = functions.init_train_loop(args, state, step, w, opt_state)
+            print("Continue main loop...", flush=True)
 
         state, w, opt_state = functions.train_loop(args, state, step, w, opt_state, un, update, apply_model)
 
