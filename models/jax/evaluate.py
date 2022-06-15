@@ -46,7 +46,7 @@ def main():
     def apply(w, x, zooms):
         return hk.without_apply_rng(hk.transform(model.unet_with_groups(train_args))).apply(w, x, zooms)
 
-    with open(f"{args.path}/w.pkl", "rb") as f:
+    with open(f"{args.path}/best_w.pkl", "rb") as f:
         w = pickle.load(f)
 
     collect_metrics = []
