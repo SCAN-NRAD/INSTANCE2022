@@ -107,7 +107,7 @@ def confusion_matrix(y: jnp.ndarray, p: jnp.ndarray) -> jnp.ndarray:
 TrainState = namedtuple("TrainState", ["time0", "sample_size", "train_set", "test_set", "confusion_matrices", "t4", "losses"])
 
 
-def init_train_loop(args, w, opt_state) -> TrainState:
+def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
     print("Prepare for the training loop...", flush=True)
     time0 = time.perf_counter()
     sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
@@ -142,14 +142,14 @@ def init_train_loop(args, w, opt_state) -> TrainState:
     )
 
 
-def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model) -> TrainState:
+def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_model) -> TrainState:
     t0 = time.perf_counter()
     t_extra = t0 - state.t4
 
-    if i == 120:
+    if step == 120:
         jax.profiler.start_trace(wandb.run.dir)
 
-    img, lab, zooms = state.train_set[i % len(state.train_set)]
+    img, lab, zooms = state.train_set[step % len(state.train_set)]
 
     # regroup zooms and sizes by rounding and taking subsets of the volume
     zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
@@ -170,7 +170,7 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
 
     t1 = time.perf_counter()
 
-    lr = args.lr * 0.1 ** math.floor(i / 40_000)
+    lr = args.lr * 0.1 ** math.floor(step / 40_000)
     w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr)
     train_loss.block_until_ready()
 
@@ -180,10 +180,10 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
         train_dice = 2 * c[1, 1] / (2 * c[1, 1] + c[1, 0] + c[0, 1])
 
     c = state.confusion_matrices
-    if i % 3 == 0:
-        j = (i // 3) % 10
+    if step % 3 == 0:
+        j = (step // 3) % 10
         img, lab, zooms = state.test_set[j]
-        test_pred = apply_model(w, img, zooms)
+        test_pred = apply_model(w, img[None], zooms)[0]
         c[j] = np.array(confusion_matrix(un(lab), un(test_pred)))
 
     t3 = time.perf_counter()
@@ -195,14 +195,14 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
 
     min_median_max = np.min(train_pred), np.median(train_pred), np.max(train_pred)
 
-    state.losses[i % len(state.train_set)] = train_loss
+    state.losses[step % len(state.train_set)] = train_loss
     t4 = time.perf_counter()
 
     dice_txt = ",".join(f"{100 * d:02.0f}" for d in dice)
     print(
         (
             f"{wandb.run.dir.split('/')[-2]} "
-            f"[{i + 1:04d}:{format_time(time.perf_counter() - state.time0)}] "
+            f"[{step + 1:04d}:{format_time(time.perf_counter() - state.time0)}] "
             f"train[ loss={np.mean(state.losses):.4f} "
             f"dice={100 * train_dice:02.0f} ] "
             f"test[ dice={dice_txt} ] "
@@ -217,7 +217,7 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
     )
 
     wandb_state = {
-        "iteration": i,
+        "iteration": step,
         "_runtime": time.perf_counter() - state.time0,
         "train_loss": train_loss,
         "avg_train_loss": np.mean(state.losses),
@@ -234,11 +234,11 @@ def train_loop(args, state: TrainState, i, w, opt_state, un, update, apply_model
     }
     wandb_state.update({f"dice_{91 + i}": d for i, d in enumerate(dice)})
 
-    if i % 500 == 0:
+    if step % 500 == 0:
         with open(f"{wandb.run.dir}/w.pkl", "wb") as f:
             pickle.dump(w, f)
 
-    if i == 120:
+    if step == 120:
         jax.profiler.stop_trace()
 
     wandb.log(wandb_state)

@@ -101,7 +101,7 @@ def main():
 
     @partial(jax.jit, static_argnums=(2,))
     def apply_model(w, x, zooms):
-        return model.apply(w, x, zooms)
+        return jax.vmap(model.apply, (None, 0, None), 0)(w, x, zooms)
 
     @partial(jax.jit, static_argnums=(4,))
     def update(w, opt_state, x, y, zooms, lr):
@@ -139,18 +139,18 @@ def main():
     opt_state = opt(args.lr).init(w)
 
     hash = hash_file(f"{wandb.run.dir}/functions.py")
-    state = functions.init_train_loop(args, w, opt_state)
+    state = functions.init_train_loop(args, None, 0, w, opt_state)
 
-    for i in range(99_999_999):
+    for step in range(99_999_999):
 
         # Reload the loop function if the code has changed
         new_hash = hash_file(f"{wandb.run.dir}/functions.py")
         if new_hash != hash:
             hash = new_hash
             importlib.reload(functions)
-            state = functions.init_train_loop(args, w, opt_state)
+            state = functions.init_train_loop(args, state, step, w, opt_state)
 
-        state, w, opt_state = functions.train_loop(args, state, i, w, opt_state, un, update, apply_model)
+        state, w, opt_state = functions.train_loop(args, state, step, w, opt_state, un, update, apply_model)
 
 
 if __name__ == "__main__":
