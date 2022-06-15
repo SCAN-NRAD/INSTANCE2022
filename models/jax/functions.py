@@ -116,7 +116,7 @@ def init_train_loop(args, w, opt_state) -> TrainState:
     train_set = [load_miccai22(args.data, i) for i in range(1, n + 1)]
 
     test_set = []
-    for i in range(91, 100 + 1):
+    for i in range(n + 1, 100 + 1):
         img, lab, zooms = load_miccai22(args.data, i)  # test data
         zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
         center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)

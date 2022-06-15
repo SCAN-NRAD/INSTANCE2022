@@ -59,6 +59,7 @@ def main():
     parser.add_argument("--min_zoom", type=float, default=0.36, help="Minimum zoom")
     parser.add_argument("--downsampling", type=float, default=2.0, help="Downsampling factor")
     parser.add_argument("--conv_diameter", type=float, default=5.0, help="Diameter of the convolution kernel")
+    parser.add_argument("--optimizer", type=str, default="adam", help="Optimizer, either adam or sgd")
     parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
     args = parser.parse_args()
 
@@ -91,6 +92,12 @@ def main():
 
     def un(img):
         return functions.unpad(img, (16, 16, 1))
+
+    def opt(lr):
+        if args.optimizer == "adam":
+            return optax.adam(lr)
+        if args.optimizer == "sgd":
+            return optax.sgd(lr, 0.9)
 
     @partial(jax.jit, static_argnums=(2,))
     def apply_model(w, x, zooms):
@@ -125,11 +132,11 @@ def main():
         grad_fn = jax.value_and_grad(h, has_aux=True)
         (loss, pred), grads = grad_fn(w, x, y)
 
-        updates, opt_state = optax.adam(lr).update(grads, opt_state)
+        updates, opt_state = opt(lr).update(grads, opt_state)
         w = optax.apply_updates(w, updates)
         return w, opt_state, loss, pred
 
-    opt_state = optax.adam(args.lr).init(w)
+    opt_state = opt(args.lr).init(w)
 
     hash = hash_file(f"{wandb.run.dir}/functions.py")
     state = functions.init_train_loop(args, w, opt_state)
