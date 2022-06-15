@@ -177,7 +177,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
 
     t1 = time.perf_counter()
 
-    lr = args.lr * 0.1 ** math.floor(step / 40_000)
+    lr = args.lr * 0.1 ** math.floor(step / args.lr_div_step)
     w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr)
     train_loss.block_until_ready()
 
