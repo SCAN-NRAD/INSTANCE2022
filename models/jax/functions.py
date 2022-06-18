@@ -177,7 +177,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
 
     t1 = time.perf_counter()
 
-    lr = args.lr * 0.1 ** math.floor(step / args.lr_div_step)
+    lr = args.lr * max(0.1 ** math.floor(step / args.lr_div_step), 0.01)
     w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr)
     train_loss.block_until_ready()
 
@@ -195,6 +195,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
             f"{wandb.run.dir.split('/')[-2]} "
             f"[{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
             f"train[ loss={np.mean(state.losses):.4f} "
+            f"LR={lr:.1e} "
             f"dice={100 * train_dice:02.0f} ] "
             f"time[ "
             f"S{format_time(t1 - t0)}+"
