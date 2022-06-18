@@ -1,7 +1,7 @@
 import math
 import pickle
 import random
-from typing import Tuple
+from typing import Tuple, List, Callable
 
 import nibabel as nib
 import numpy as np
@@ -295,3 +295,70 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         best_min_dice=best_min_dice,
     )
     return (state, w, opt_state)
+
+
+def patch_slices(total: int, size: int, pad: int, overlap: float) -> List[int]:
+    r"""
+    Generate a list of patch indices such that the center of the patches (unpaded patches) cover the full image.
+
+    Args:
+        total: The total size of the image.
+        size: The size of the patch.
+        pad: The padding of the patch.
+    """
+    naive = list(range(0, total - size, round((size - 2 * pad) / overlap))) + [total - size]
+    return np.round(np.linspace(0, total - size, len(naive))).astype(int)
+
+
+def eval_model(
+    img: jnp.ndarray,
+    apply: Callable[[jnp.ndarray], jnp.ndarray],
+    size: Tuple[int, int, int],
+    pads: Tuple[int, int, int],
+    overlap: float,
+    verbose: bool = False,
+) -> np.ndarray:
+    assert img.ndim == 3 + 1
+
+    pos = np.stack(
+        np.meshgrid(
+            np.linspace(-1.3, 1.3, size[0] - 2 * pads[0]),
+            np.linspace(-1.3, 1.3, size[1] - 2 * pads[1]),
+            np.linspace(-1.3, 1.3, size[2] - 2 * pads[2]),
+            indexing="ij",
+        ),
+        axis=-1,
+    )
+    gaussian = np.exp(-np.linalg.norm(pos, axis=-1) ** 2)
+
+    sum = np.zeros_like(img[:, :, :, 0])
+    num = np.zeros_like(img[:, :, :, 0])
+
+    for i in patch_slices(img.shape[0], size[0], pads[0], overlap):
+        for j in patch_slices(img.shape[1], size[1], pads[1], overlap):
+            for k in patch_slices(img.shape[2], size[2], pads[2], overlap):
+                x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
+                p = apply(x)
+                p = unpad(p, pads)
+
+                sum[
+                    i + pads[0] : i + size[0] - pads[0],
+                    j + pads[1] : j + size[1] - pads[1],
+                    k + pads[2] : k + size[2] - pads[2],
+                ] += (
+                    p * gaussian
+                )
+                num[
+                    i + pads[0] : i + size[0] - pads[0],
+                    j + pads[1] : j + size[1] - pads[1],
+                    k + pads[2] : k + size[2] - pads[2],
+                ] += gaussian
+
+                if verbose:
+                    print(i, j, k, flush=True)
+
+    negative_value = -10.0
+    sum[num == 0] = negative_value
+    num[num == 0] = 1.0
+
+    return sum / num

@@ -2,7 +2,6 @@ import argparse
 import pickle
 import sys
 from functools import partial
-from typing import List
 
 import haiku as hk
 import nibabel as nib
@@ -10,19 +9,6 @@ import numpy as np
 from monai.metrics.hausdorff_distance import compute_hausdorff_distance
 
 import jax
-
-
-def ite(total: int, size: int, pad: int, overlap: float) -> List[int]:
-    r"""
-    Generate a list of patch indices such that the center of the patches (unpaded patches) cover the full image.
-
-    Args:
-        total: The total size of the image.
-        size: The size of the patch.
-        pad: The padding of the patch.
-    """
-    naive = list(range(0, total - size, round((size - 2 * pad) / overlap))) + [total - size]
-    return np.round(np.linspace(0, total - size, len(naive))).astype(int)
 
 
 def main():
@@ -35,7 +21,7 @@ def main():
     print(args.path, flush=True)
     sys.path.insert(0, args.path)
     import model  # noqa: F401
-    from functions import load_miccai22, unpad  # noqa: F401
+    from functions import load_miccai22, eval_model  # noqa: F401
 
     # Load model args
     with open(f"{args.path}/args.pkl", "rb") as f:
@@ -55,53 +41,8 @@ def main():
         print(f"Evaluating run {idx}", flush=True)
         img, lab, zooms = load_miccai22(args.data, idx)
         zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
-
-        size = (100, 100, 25)
-        pads = (16, 16, 1)
-        overlap = 2.0
-
-        pos = np.stack(
-            np.meshgrid(
-                np.linspace(-1.3, 1.3, size[0] - 2 * pads[0]),
-                np.linspace(-1.3, 1.3, size[1] - 2 * pads[1]),
-                np.linspace(-1.3, 1.3, size[2] - 2 * pads[2]),
-                indexing="ij",
-            ),
-            axis=-1,
-        )
-        gaussian = np.exp(-np.linalg.norm(pos, axis=-1) ** 2)
-
-        sum = np.zeros_like(lab)
-        num = np.zeros_like(lab)
-
-        for i in ite(img.shape[0], size[0], pads[0], overlap):
-            for j in ite(img.shape[1], size[1], pads[1], overlap):
-                for k in ite(img.shape[2], size[2], pads[2], overlap):
-                    x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
-                    p = apply(w, x, zooms)
-                    p = unpad(p, pads)
-
-                    sum[
-                        i + pads[0] : i + size[0] - pads[0],
-                        j + pads[1] : j + size[1] - pads[1],
-                        k + pads[2] : k + size[2] - pads[2],
-                    ] += (
-                        p * gaussian
-                    )
-                    num[
-                        i + pads[0] : i + size[0] - pads[0],
-                        j + pads[1] : j + size[1] - pads[1],
-                        k + pads[2] : k + size[2] - pads[2],
-                    ] += gaussian
-
-                    print(i, j, k, flush=True)
+        pred = eval_model(img, lambda x: apply(w, x, zooms), (100, 100, 25), (16, 16, 1), 2.0, True)
         print(flush=True)
-
-        negative_value = -10.0
-        sum[num == 0] = negative_value
-        num[num == 0] = 1.0
-
-        pred = sum / num
 
         original = nib.load(f"{args.data}/label/{idx:03d}.nii.gz")
         y_gt = original.get_fdata()
