@@ -232,7 +232,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
                 lambda x: apply_model(w, x, zooms),
                 sample_size,
                 pads=(16, 16, 1),
-                overlap=1.5,
+                overlap=1.0,
             )
             c[j] = np.array(confusion_matrix(un(lab), un(test_pred)))
 
