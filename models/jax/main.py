@@ -66,6 +66,8 @@ def main():
     parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
     args = parser.parse_args()
 
+    print(args, flush=True)
+
     wandb.init(project="miccai22", entity="instance2022", name=args.name, dir=args.logdir, config=args)
     shutil.copy(__file__, f"{wandb.run.dir}/main.py")
     shutil.copy("./model.py", f"{wandb.run.dir}/model.py")
