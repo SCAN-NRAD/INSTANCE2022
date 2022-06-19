@@ -110,7 +110,6 @@ TrainState = namedtuple(
         "time0",
         "train_set",
         "test_set",
-        "confusion_matrices",
         "t4",
         "losses",
         "best_min_dice",
@@ -148,9 +147,8 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
         time0=getattr(old_state, "time0", time.perf_counter()),
         train_set=train_set,
         test_set=test_set,
-        confusion_matrices=np.zeros((len(test_set), 2, 2)),
         t4=time.perf_counter(),
-        losses=np.ones((len(train_set),)),
+        losses=getattr(old_state, "losses", np.ones((len(train_set),))),
         best_min_dice=getattr(old_state, "best_min_dice", 0.0),
         best2_min_dice=getattr(old_state, "best2_min_dice", 0.0),
     )
@@ -225,7 +223,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
     best2_min_dice = state.best_min_dice
 
     if step % 50 == 0:
-        c = state.confusion_matrices
+        c = np.zeros((len(state.test_set), 2, 2))
         for j, (img, lab, zooms) in enumerate(state.test_set):
             test_pred = eval_model(
                 img,
@@ -309,7 +307,6 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         time0=state.time0,
         train_set=state.train_set,
         test_set=state.test_set,
-        confusion_matrices=state.confusion_matrices,
         t4=t4,
         losses=state.losses,
         best_min_dice=best_min_dice,
