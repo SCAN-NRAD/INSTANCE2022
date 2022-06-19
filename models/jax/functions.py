@@ -106,13 +106,21 @@ def confusion_matrix(y: jnp.ndarray, p: jnp.ndarray) -> jnp.ndarray:
 
 TrainState = namedtuple(
     "TrainState",
-    ["time0", "sample_size", "train_set", "test_set", "confusion_matrices", "t4", "losses", "best_w", "best_min_dice"],
+    [
+        "time0",
+        "train_set",
+        "test_set",
+        "confusion_matrices",
+        "t4",
+        "losses",
+        "best_min_dice",
+        "best2_min_dice",
+    ],
 )
 
 
 def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
     print("Prepare for the training loop...", flush=True)
-    sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
 
     if args.dummy:
         train_idx = [1, 2]
@@ -124,27 +132,27 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
     train_set = [load_miccai22(args.data, i) for i in train_idx]
 
     test_set = []
+    test_sample_size = np.array([200, 200, 25])
     for i in test_idx:
         img, lab, zooms = load_miccai22(args.data, i)  # test data
         zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
         center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
-        start = np.maximum(center_of_mass - np.array(sample_size) // 2, 0)
-        end = np.minimum(start + np.array(sample_size), np.array(img.shape[:3]))
-        start = end - np.array(sample_size)
+        start = np.maximum(center_of_mass - test_sample_size // 2, 0)
+        end = np.minimum(start + test_sample_size, np.array(img.shape[:3]))
+        start = end - test_sample_size
         img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         test_set.append((img, lab, zooms))
 
     return TrainState(
         time0=getattr(old_state, "time0", time.perf_counter()),
-        sample_size=sample_size,
         train_set=train_set,
         test_set=test_set,
         confusion_matrices=np.zeros((len(test_set), 2, 2)),
         t4=time.perf_counter(),
         losses=np.ones((len(train_set),)),
-        best_w=getattr(old_state, "best_w", jax.tree_map(np.array, w)),
         best_min_dice=getattr(old_state, "best_min_dice", 0.0),
+        best2_min_dice=getattr(old_state, "best2_min_dice", 0.0),
     )
 
 
@@ -156,20 +164,21 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         jax.profiler.start_trace(wandb.run.dir)
 
     img, lab, zooms = state.train_set[step % len(state.train_set)]
+    sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
 
     # regroup zooms and sizes by rounding and taking subsets of the volume
     zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
     if np.random.rand() < 0.5:
         # avoid patch without label
         while True:
-            x, y = random_sample(img, lab, state.sample_size)
+            x, y = random_sample(img, lab, sample_size)
             if np.any(un(y) == 1):
                 img, lab = x, y
                 break
     else:
         # avoid patch full of air
         while True:
-            x, y = random_sample(img, lab, state.sample_size)
+            x, y = random_sample(img, lab, sample_size)
             if np.any(x > 0.0):
                 img, lab = x, y
                 break
@@ -213,12 +222,18 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         jax.profiler.stop_trace()
 
     best_min_dice = state.best_min_dice
-    best_w = state.best_w
+    best2_min_dice = state.best_min_dice
 
     if step % 50 == 0:
         c = state.confusion_matrices
         for j, (img, lab, zooms) in enumerate(state.test_set):
-            test_pred = apply_model(w, img, zooms)
+            test_pred = eval_model(
+                img,
+                lambda x: apply_model(w, x, zooms),
+                sample_size,
+                pads=(16, 16, 1),
+                overlap=1.5,
+            )
             c[j] = np.array(confusion_matrix(un(lab), un(test_pred)))
 
         with np.errstate(invalid="ignore"):
@@ -228,11 +243,17 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
 
         if np.min(dice) > state.best_min_dice:
             best_min_dice = np.min(dice)
-            best_w = jax.tree_map(np.array, w)
             wandb.log({"best_min_dice": best_min_dice}, commit=False, step=step)
 
             with open(f"{wandb.run.dir}/best_w.pkl", "wb") as f:
-                pickle.dump(best_w, f)
+                pickle.dump(w, f)
+
+        if np.sort(dice)[1] > state.best2_min_dice:
+            best2_min_dice = np.sort(dice)[1]
+            wandb.log({"best2_min_dice": best2_min_dice}, commit=False, step=step)
+
+            with open(f"{wandb.run.dir}/best2_w.pkl", "wb") as f:
+                pickle.dump(w, f)
 
         dice_txt = ",".join(f"{100 * d:02.0f}" for d in dice)
 
@@ -242,7 +263,8 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
             (
                 f"{wandb.run.dir.split('/')[-2]} "
                 f"[{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
-                f"test[ dice={dice_txt} best_min_dice={100 * best_min_dice:02.0f}] "
+                f"test[ dice={dice_txt} "
+                f"best_min_dice={100 * best_min_dice:02.0f} {100 * best2_min_dice:02.0f}] "
                 f"time[ "
                 f"E{format_time(t4 - t2)} ]"
             ),
@@ -285,14 +307,13 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
 
     state = TrainState(
         time0=state.time0,
-        sample_size=state.sample_size,
         train_set=state.train_set,
         test_set=state.test_set,
         confusion_matrices=state.confusion_matrices,
         t4=t4,
         losses=state.losses,
-        best_w=best_w,
         best_min_dice=best_min_dice,
+        best2_min_dice=best2_min_dice,
     )
     return (state, w, opt_state)
 
@@ -305,8 +326,10 @@ def patch_slices(total: int, size: int, pad: int, overlap: float) -> List[int]:
         total: The total size of the image.
         size: The size of the patch.
         pad: The padding of the patch.
+        overlap: The overlap of the patches.
     """
-    naive = list(range(0, total - size, round((size - 2 * pad) / overlap))) + [total - size]
+    step = max(1, round((size - 2 * pad) / overlap))
+    naive = list(range(0, total - size, step)) + [total - size]
     return np.round(np.linspace(0, total - size, len(naive))).astype(int)
 
 
