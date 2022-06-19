@@ -90,11 +90,20 @@ class MixChannels(hk.Module):
 
 
 def g(x: e3nn.IrrepsData) -> e3nn.IrrepsData:
-    return e3nn.gate(x, odd_act=jnp.tanh)
+    return e3nn.gate(
+        x,
+        even_act=jax.nn.gelu,
+        odd_act=jax.nn.tanh,
+        even_gate_act=jax.nn.sigmoid,
+        odd_gate_act=jax.nn.tanh,
+    )
 
 
-def bn(x: e3nn.IrrepsData) -> e3nn.IrrepsData:
-    f = e3nn.BatchNorm(instance=True, eps=0.6)
+def bn(x: e3nn.IrrepsData, eps: float) -> e3nn.IrrepsData:
+    if eps >= 1:
+        return x
+
+    f = e3nn.BatchNorm(instance=True, eps=eps)
     if x.ndim == 1 + 3:
         return f(x)
     if x.ndim == 1 + 3 + 1:
@@ -135,7 +144,7 @@ def unet_with_groups(args):
             },
         )
 
-        def cbg(vox: Voxels, mul: float, *, radius: float, filter=None, normalize=True) -> Voxels:
+        def cbg(vox: Voxels, mul: float, *, radius: float, filter=None) -> Voxels:
             mul = round(mul)
             assert len(vox.data.shape) == 1 + 3 + 1  # (batch, x, y, z, channel)
 
@@ -155,20 +164,17 @@ def unet_with_groups(args):
 
             # Linear
             x = n_vmap(1 + 3, MixChannels(mul, irreps))(x)
-            if normalize:
-                x = bn(x)
+            x = bn(x, args.instance_norm_eps)
             x = g(x)
 
             # Convolution
             x = jax.vmap(Convolution(irreps, diameter=2.0 * radius, steps=vox.zooms, **kw), 4, 4)(x)
-            if normalize:
-                x = bn(x)
+            x = bn(x, args.instance_norm_eps)
             x = g(x)
 
             # Linear
             x = n_vmap(1 + 3, MixChannels(mul, irreps))(x)
-            if normalize:
-                x = bn(x)
+            x = bn(x, args.instance_norm_eps)
             x = g(x)
 
             return Voxels(zooms=vox.zooms, data=x)
@@ -230,7 +236,7 @@ def unet_with_groups(args):
             min_zoom /= args.downsampling
             x = group_conv(x, irreps="0e", mul=round(mul), radius=cvrad * min_zoom)
             x = x.data.repeat_irreps_by_last_axis()  # [batch, x, y, z, irreps]
-            x = bn(x)
+            x = bn(x, args.instance_norm_eps)
             x = g(x)
             x = n_vmap(1 + 3, e3nn.Linear("0e"))(x)
             return x.contiguous[0, :, :, :, 0]
@@ -285,7 +291,7 @@ def unet_with_groups(args):
 
         print_stats("MLP", x)
         for h in [round(16 * mul), round(16 * mul), 1]:
-            x = bn(x)
+            x = bn(x, args.instance_norm_eps)
             x = g(x)
             x = n_vmap(1 + 3, e3nn.Linear(f"{h}x0e"))(x)
 
