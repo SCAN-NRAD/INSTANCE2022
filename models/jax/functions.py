@@ -222,7 +222,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
     best_min_dice = state.best_min_dice
     best2_min_dice = state.best_min_dice
 
-    if step % 50 == 0:
+    if step % 100 == 0:
         c = np.zeros((len(state.test_set), 2, 2))
         for j, (img, lab, zooms) in enumerate(state.test_set):
             test_pred = eval_model(
