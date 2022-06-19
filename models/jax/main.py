@@ -34,7 +34,6 @@ def main():
     print("Welcome", flush=True)
     # Parse arguments
     parser = argparse.ArgumentParser(description="Train a model")
-    parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--data", type=str, default="../../train_2", help="Path to data")
     parser.add_argument("--logdir", type=str, default=".", help="Path to log directory")
@@ -44,7 +43,7 @@ def main():
     parser.add_argument("--trainset_stop", type=int, default=90, help="Stop index of training set")
     parser.add_argument("--pretrained", type=str, default=None, help="Path to npy file")
     parser.add_argument("--equivariance", type=str, default="E3", help="Equivariance group")
-    parser.add_argument("--width", type=int, default=5, help="Width of the network")
+    parser.add_argument("--width", type=int, default=7, help="Width of the network")
     for l in range(4 + 1):
         parser.add_argument(
             f"--num_radial_basis_sh{l}",
