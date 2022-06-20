@@ -182,7 +182,7 @@ def predict_equivariant_3channel(checkpoint_dir, gpu='cuda', downsample = 3, cut
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
 def three_channel_experiments(checkpoint_dir,downsample,gpu):
-    #train_equivariant_3channel(checkpoint_dir,200,'right',downsample=downsample,gpu=gpu,n=2)
-    predict_equivariant_3channel(checkpoint_dir,gpu,downsample=downsample,n=2)
+    train_equivariant_3channel(checkpoint_dir,200,'right',downsample=downsample,gpu=gpu,n=3)
+    predict_equivariant_3channel(checkpoint_dir,gpu,downsample=downsample,n=3)
 
-three_channel_experiments('/home/diaz/experiments/INSTANCE2022_3channel',3,'cuda')
+three_channel_experiments('/home/diaz/experiments/INSTANCE2022_3channel_n3',3,'cuda')
