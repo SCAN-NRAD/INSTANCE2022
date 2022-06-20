@@ -220,7 +220,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         jax.profiler.stop_trace()
 
     best_min_dice = state.best_min_dice
-    best2_min_dice = state.best_min_dice
+    best2_min_dice = state.best2_min_dice
 
     if step % 100 == 0:
         c = np.zeros((len(state.test_set), 2, 2))
