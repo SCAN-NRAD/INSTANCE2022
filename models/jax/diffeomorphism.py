@@ -18,7 +18,7 @@ def scalar_field_modes(size, num_modes):
     with jax.core.eval_context():
         k = jnp.arange(1, num_modes + 1)
         i, j = jnp.meshgrid(k, k, indexing="ij")
-        r = jnp.sqrt(i ** 2 + j ** 2)
+        r = jnp.sqrt(i**2 + j**2)
         e = (r < num_modes + 0.5) / r
 
         x = jnp.linspace(0, 1, size)
@@ -45,8 +45,8 @@ def scalar_field(size, num_modes, rng_key):
     return jnp.einsum("ij,xi,yj->yx", c, s, s)
 
 
-@jax.jit
-def remap(image, dx, dy):
+@partial(jax.jit, static_argnums=(3,))
+def remap(image, dx, dy, interpolation="linear"):
     """
     Remap image(s) using displacement field dx, dy
 
@@ -67,30 +67,39 @@ def remap(image, dx, dy):
     xn = jnp.clip(x - dx, 0, size2 - 1)
     yn = jnp.clip(y - dy, 0, size1 - 1)
 
-    xf = jnp.floor(xn).astype(jnp.int32)
-    yf = jnp.floor(yn).astype(jnp.int32)
-    xc = jnp.ceil(xn).astype(jnp.int32)
-    yc = jnp.ceil(yn).astype(jnp.int32)
+    if interpolation == "linear":
+        xf = jnp.floor(xn).astype(jnp.int32)
+        yf = jnp.floor(yn).astype(jnp.int32)
+        xc = jnp.ceil(xn).astype(jnp.int32)
+        yc = jnp.ceil(yn).astype(jnp.int32)
 
-    xv = xn - xf
-    yv = yn - yf
+        xv = xn - xf
+        yv = yn - yf
 
-    return (
-        (1 - yv) * (1 - xv) * image[..., yf, xf]
-        + (1 - yv) * xv * image[..., yf, xc]
-        + yv * (1 - xv) * image[..., yc, xf]
-        + yv * xv * image[..., yc, xc]
-    )
+        return (
+            (1 - yv) * (1 - xv) * image[..., yf, xf]
+            + (1 - yv) * xv * image[..., yf, xc]
+            + yv * (1 - xv) * image[..., yc, xf]
+            + yv * xv * image[..., yc, xc]
+        )
+    if interpolation == "nearest":
+        xf = jnp.round(xn).astype(jnp.int32)
+        yf = jnp.round(yn).astype(jnp.int32)
+        return image[..., yf, xf]
 
 
-@partial(jax.jit, static_argnums=(2,))
-def deform(image, T, num_modes, rng_key):
+@partial(jax.jit, static_argnums=(2, 4))
+def deform(image, T, num_modes, rng_key, interpolation="linear"):
     """
-    1. Sample a displacement field tau: R2 -> R2, using tempertature `T` and cutoff `cut`
-    2. Apply tau to `image`
-    :param img Tensor: square image(s) [..., y, x]
-    :param T float: temperature
-    :param cut int: high frequency cutoff
+    Args:
+        image: image(s) [..., y, x]
+        T: temperature
+        num_modes: number of modes
+        rng_key: random number generator key
+        interpolation: interpolation method, "linear" or "nearest"
+
+    Returns:
+        deformed image(s)
     """
     size = image.shape[-1]
     assert image.shape[-2] == size, "Image(s) should be square."
@@ -105,7 +114,7 @@ def deform(image, T, num_modes, rng_key):
     dy = jnp.sqrt(T) * size * v
 
     # Apply tau
-    return remap(image, dx, dy)
+    return remap(image, dx, dy, interpolation)
 
 
 def displacement_from_temperature(T, num_modes, size):
@@ -113,7 +122,7 @@ def displacement_from_temperature(T, num_modes, size):
 
 
 def temperature_from_displacement(delta, num_modes, size):
-    return (2 * delta) ** 2 / (jnp.pi * size ** 2 * jnp.log(num_modes))
+    return (2 * delta) ** 2 / (jnp.pi * size**2 * jnp.log(num_modes))
 
 
 def temperature_range(size, num_modes):
@@ -122,5 +131,5 @@ def temperature_range(size, num_modes):
     for given image size and num_modes.
     """
     T1 = temperature_from_displacement(0.5, num_modes, size)
-    T2 = 4 / (jnp.pi ** 3 * num_modes ** 2 * jnp.log(num_modes))
+    T2 = 4 / (jnp.pi**3 * num_modes**2 * jnp.log(num_modes))
     return T1, T2

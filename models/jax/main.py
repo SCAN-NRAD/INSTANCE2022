@@ -62,7 +62,7 @@ def main():
     parser.add_argument("--conv_diameter", type=float, default=5.0, help="Diameter of the convolution kernel")
     parser.add_argument("--instance_norm_eps", type=float, default=0.6, help="Instance normalization epsilon")
     parser.add_argument("--optimizer", type=str, default="adam", help="Optimizer, either adam or sgd")
-    parser.add_argument("--lr_div_step", type=int, default=10_000, help="Learning rate decay step")
+    parser.add_argument("--lr_div_step", type=int, default=20_000, help="Learning rate decay step")
     parser.add_argument("--augmentation_noise", type=float, default=0.0, help="Probability to add noise augmentation")
     parser.add_argument(
         "--augmentation_deformation", type=float, default=0.0, help="Probability to add deformation augmentation"
