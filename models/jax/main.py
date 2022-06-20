@@ -63,6 +63,10 @@ def main():
     parser.add_argument("--instance_norm_eps", type=float, default=0.6, help="Instance normalization epsilon")
     parser.add_argument("--optimizer", type=str, default="adam", help="Optimizer, either adam or sgd")
     parser.add_argument("--lr_div_step", type=int, default=10_000, help="Learning rate decay step")
+    parser.add_argument("--augmentation_noise", type=float, default=0.0, help="Probability to add noise augmentation")
+    parser.add_argument(
+        "--augmentation_deformation", type=float, default=0.0, help="Probability to add deformation augmentation"
+    )
     parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
     args = parser.parse_args()
 
@@ -73,6 +77,7 @@ def main():
     shutil.copy("./model.py", f"{wandb.run.dir}/model.py")
     shutil.copy("./functions.py", f"{wandb.run.dir}/functions.py")
     shutil.copy("./evaluate.py", f"{wandb.run.dir}/evaluate.py")
+    shutil.copy("./diffeomorphism.py", f"{wandb.run.dir}/diffeomorphism.py")
     sys.path.insert(0, wandb.run.dir)
     import functions
 

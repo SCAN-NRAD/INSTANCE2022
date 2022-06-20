@@ -1,17 +1,40 @@
 import math
 import pickle
 import random
-from typing import Tuple, List, Callable
+import time
+from collections import namedtuple
+from typing import Callable, List, Tuple
 
 import nibabel as nib
 import numpy as np
 
 import jax
 import jax.numpy as jnp
-from jax.scipy.special import logsumexp
-import time
 import wandb
-from collections import namedtuple
+from diffeomorphism import deform, scalar_field
+from jax.scipy.special import logsumexp
+
+
+@jax.jit
+def noise_mri(rng, img):
+    assert img.shape[0] == img.shape[1]
+    noise = jax.vmap(lambda r: scalar_field(img.shape[0], 128, r), 0, 2)(jax.random.split(rng, img.shape[2] * img.shape[3]))
+    return img + 1e-2 * jnp.reshape(noise, img.shape)
+
+
+@jax.jit
+def deform_mri(rng, img):
+    assert img.shape[0] == img.shape[1]
+    rng = jax.random.split(rng, img.shape[2])
+    return jax.vmap(
+        lambda j: jax.vmap(
+            lambda i, r: deform(i, 1e-5, 16, r),
+            (2, 0),
+            2,
+        )(j, rng),
+        3,
+        3,
+    )(img)
 
 
 def load_miccai22(path: str, i: int) -> Tuple[np.ndarray, np.ndarray, Tuple[float, float, float]]:
@@ -161,6 +184,17 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
 
     img, lab, zooms = state.train_set[step % len(state.train_set)]
     sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
+
+    # data augmentation
+    rng = jax.random.split(jax.random.PRNGKey(step), 4)
+
+    if jax.random.uniform(rng[0]) < args.augmentation_noise:
+        img = noise_mri(rng[1], img)
+
+    if jax.random.uniform(rng[2]) < args.augmentation_deformation:
+        img = deform_mri(rng[3], img)
+        lab = deform_mri(rng[3], lab[..., np.newaxis])[..., 0]
+        lab = jnp.round(lab)
 
     # regroup zooms and sizes by rounding and taking subsets of the volume
     zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
