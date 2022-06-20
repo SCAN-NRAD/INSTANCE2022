@@ -164,7 +164,7 @@ def predict_equivariant_3channel(checkpoint_dir, gpu='cuda', downsample = 3, cut
 
         img = batch['image'][0,...]
         label = batch['label']
-        output = model.predict_3D(torch.from_numpy(img.numpy()).float().cuda(),do_mirroring=False, patch_size=(128,128,128),
+        output = model.predict_3D(img.cpu().numpy(),do_mirroring=False, patch_size=(128,128,128),
                                 use_sliding_window=True, use_gaussian = True,verbose=False)
 
         pred_file_name = sav_dir+os.path.basename(batch['name'][0])+f'_pred.nii.gz'
