@@ -24,17 +24,21 @@ def noise_mri(rng, img):
 
 @jax.jit
 def deform_mri(rng, img):
+    r"""Apply a diffeomorphism to an MRI image.
+    Apply the same deformation to all slices of the image.
+
+    Args:
+        rng: A random number generator.
+        img: The MRI image ``[x, y, ...]``
+
+    Returns:
+        The deformed image.
+    """
     assert img.shape[0] == img.shape[1]
-    rng = jax.random.split(rng, img.shape[2])
-    return jax.vmap(
-        lambda j: jax.vmap(
-            lambda i, r: deform(i, 1e-5, 16, r),
-            (2, 0),
-            2,
-        )(j, rng),
-        3,
-        3,
-    )(img)
+    f = lambda i: deform(i, 2e-4, 5, rng, "nearest")
+    for _ in range(img.ndim - 2):
+        f = jax.vmap(f, -1, -1)
+    return f(img)
 
 
 def load_miccai22(path: str, i: int) -> Tuple[np.ndarray, np.ndarray, Tuple[float, float, float]]:
