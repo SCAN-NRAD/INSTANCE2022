@@ -7,7 +7,7 @@ import nibabel as nib
 from torch.utils.data import DataLoader
 from equivariant_unet_physical_units import UNet
 from train import train_one_model
-from dataset import INSTANCE_2022
+from dataset import INSTANCE_2022, INSTANCE_2022_3channels
 from tensorboardX import SummaryWriter 
 from torch.utils.data import DataLoader
 
@@ -121,7 +121,7 @@ def train_equivariant_3channel(checkpoint_path, epoch_end,cutoff='right',downsam
 
     training_cases = 'training_cases.txt'
 
-    dataset = INSTANCE_2022(training_cases, patch_size = 128,check_labels=True) 
+    dataset = INSTANCE_2022_3channels(training_cases, patch_size = 128,check_labels=True) 
 
     device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
 
@@ -147,7 +147,7 @@ def predict_equivariant_3channel(checkpoint_dir, gpu='cuda', downsample = 3, cut
 
     testing_cases = 'testing_cases.txt'
 
-    dataset = INSTANCE_2022(testing_cases, patch_size = 0) 
+    dataset = INSTANCE_2022_3channels(testing_cases, patch_size = 0) 
     test_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
 
     input_irreps = "3x0e"
