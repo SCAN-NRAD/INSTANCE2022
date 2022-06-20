@@ -31,18 +31,19 @@ def hash_file(file_path: str) -> str:
 
 
 def main():
-    print("main", flush=True)
+    print("Welcome", flush=True)
     # Parse arguments
     parser = argparse.ArgumentParser(description="Train a model")
-    parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--data", type=str, default="../../train_2", help="Path to data")
     parser.add_argument("--logdir", type=str, default=".", help="Path to log directory")
     parser.add_argument("--seed_init", type=int, default=1, help="Random seed")
     parser.add_argument("--name", type=str, required=True, help="Name of the run")
+    parser.add_argument("--trainset_start", type=int, default=1, help="Start index of training set")
+    parser.add_argument("--trainset_stop", type=int, default=90, help="Stop index of training set")
     parser.add_argument("--pretrained", type=str, default=None, help="Path to npy file")
     parser.add_argument("--equivariance", type=str, default="E3", help="Equivariance group")
-    parser.add_argument("--width", type=int, default=5, help="Width of the network")
+    parser.add_argument("--width", type=int, default=7, help="Width of the network")
     for l in range(4 + 1):
         parser.add_argument(
             f"--num_radial_basis_sh{l}",
@@ -59,15 +60,24 @@ def main():
     parser.add_argument("--min_zoom", type=float, default=0.36, help="Minimum zoom")
     parser.add_argument("--downsampling", type=float, default=2.0, help="Downsampling factor")
     parser.add_argument("--conv_diameter", type=float, default=5.0, help="Diameter of the convolution kernel")
+    parser.add_argument("--instance_norm_eps", type=float, default=0.6, help="Instance normalization epsilon")
     parser.add_argument("--optimizer", type=str, default="adam", help="Optimizer, either adam or sgd")
+    parser.add_argument("--lr_div_step", type=int, default=10_000, help="Learning rate decay step")
+    parser.add_argument("--augmentation_noise", type=float, default=0.0, help="Probability to add noise augmentation")
+    parser.add_argument(
+        "--augmentation_deformation", type=float, default=0.0, help="Probability to add deformation augmentation"
+    )
     parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
     args = parser.parse_args()
+
+    print(args, flush=True)
 
     wandb.init(project="miccai22", entity="instance2022", name=args.name, dir=args.logdir, config=args)
     shutil.copy(__file__, f"{wandb.run.dir}/main.py")
     shutil.copy("./model.py", f"{wandb.run.dir}/model.py")
     shutil.copy("./functions.py", f"{wandb.run.dir}/functions.py")
     shutil.copy("./evaluate.py", f"{wandb.run.dir}/evaluate.py")
+    shutil.copy("./diffeomorphism.py", f"{wandb.run.dir}/diffeomorphism.py")
     sys.path.insert(0, wandb.run.dir)
     import functions
 
@@ -139,18 +149,20 @@ def main():
     opt_state = opt(args.lr).init(w)
 
     hash = hash_file(f"{wandb.run.dir}/functions.py")
-    state = functions.init_train_loop(args, w, opt_state)
+    state = functions.init_train_loop(args, None, 0, w, opt_state)
+    print("Start main loop...", flush=True)
 
-    for i in range(99_999_999):
+    for step in range(99_999_999):
 
         # Reload the loop function if the code has changed
         new_hash = hash_file(f"{wandb.run.dir}/functions.py")
         if new_hash != hash:
             hash = new_hash
             importlib.reload(functions)
-            state = functions.init_train_loop(args, w, opt_state)
+            state = functions.init_train_loop(args, state, step, w, opt_state)
+            print("Continue main loop...", flush=True)
 
-        state, w, opt_state = functions.train_loop(args, state, i, w, opt_state, un, update, apply_model)
+        state, w, opt_state = functions.train_loop(args, state, step, w, opt_state, un, update, apply_model)
 
 
 if __name__ == "__main__":

@@ -6,3 +6,4 @@ __pycache__
 foo.py
 models/jax/offline-run*
 data.ipynb
+*.nii.gz
