@@ -112,8 +112,7 @@ TrainState = namedtuple(
         "test_set",
         "t4",
         "losses",
-        "best_min_dice",
-        "best2_min_dice",
+        "best_sorted_dices",
     ],
 )
 
@@ -149,8 +148,7 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
         test_set=test_set,
         t4=time.perf_counter(),
         losses=getattr(old_state, "losses", np.ones((len(train_set),))),
-        best_min_dice=getattr(old_state, "best_min_dice", 0.0),
-        best2_min_dice=getattr(old_state, "best2_min_dice", 0.0),
+        best_sorted_dices=getattr(old_state, "best_sorted_dices", np.zeros((len(test_set),))),
     )
 
 
@@ -219,9 +217,6 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
     if step == 120:
         jax.profiler.stop_trace()
 
-    best_min_dice = state.best_min_dice
-    best2_min_dice = state.best2_min_dice
-
     if step % 100 == 0:
         c = np.zeros((len(state.test_set), 2, 2))
         for j, (img, lab, zooms) in enumerate(state.test_set):
@@ -239,21 +234,16 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
 
         wandb.log({f"dice_{91 + i}": d for i, d in enumerate(dice)}, commit=False, step=step)
 
-        if np.min(dice) > state.best_min_dice:
-            best_min_dice = np.min(dice)
-            wandb.log({"best_min_dice": best_min_dice}, commit=False, step=step)
-
-            with open(f"{wandb.run.dir}/best_w.pkl", "wb") as f:
-                pickle.dump(w, f)
-
-        if np.sort(dice)[1] > state.best2_min_dice:
-            best2_min_dice = np.sort(dice)[1]
-            wandb.log({"best2_min_dice": best2_min_dice}, commit=False, step=step)
-
-            with open(f"{wandb.run.dir}/best2_w.pkl", "wb") as f:
-                pickle.dump(w, f)
+        sorted_dices = np.sort(dice)
+        for i, (old_dice, new_dice) in enumerate(zip(state.best_sorted_dices, sorted_dices)):
+            if new_dice > old_dice:
+                state.best_sorted_dices[i] = new_dice
+                wandb.log({f"best{i}_min_dice": new_dice}, commit=False, step=step)
+                with open(f"{wandb.run.dir}/best{i}_w.pkl", "wb") as f:
+                    pickle.dump(w, f)
 
         dice_txt = ",".join(f"{100 * d:02.0f}" for d in dice)
+        best_dice_txt = ",".join(f"{100 * d:02.0f}" for d in state.best_sorted_dices)
 
         t4 = time.perf_counter()
 
@@ -262,7 +252,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
                 f"{wandb.run.dir.split('/')[-2]} "
                 f"[{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
                 f"test[ dice={dice_txt} "
-                f"best_min_dice={100 * best_min_dice:02.0f} {100 * best2_min_dice:02.0f}] "
+                f"best_sorted_dices={best_dice_txt}] "
                 f"time[ "
                 f"E{format_time(t4 - t2)} ]"
             ),
@@ -309,8 +299,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         test_set=state.test_set,
         t4=t4,
         losses=state.losses,
-        best_min_dice=best_min_dice,
-        best2_min_dice=best2_min_dice,
+        best_sorted_dices=state.best_sorted_dices,
     )
     return (state, w, opt_state)
 
