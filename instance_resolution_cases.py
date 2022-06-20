@@ -12,5 +12,13 @@ for i, case in enumerate(cases):
 
 np.save('instance_resolutions.npy',res)
     
-    
-    
+#%%
+import numpy as np
+resolutions = np.abs(np.load('instance_resolutions.npy') )
+rounded  = np.round(433*abs(resolutions))/433 #mario code
+print(f'unique resolutions: {len(np.unique(resolutions,axis=0))}') 
+print(f'unique rounded resolutions (mario version): {len(np.unique(rounded,axis=0))}') 
+print(f'unique rounded resolutions (3 decimals): {len(np.unique(np.round(resolutions,decimals=1),axis=0))}') 
+
+
+# %%
