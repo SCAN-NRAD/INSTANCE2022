@@ -164,7 +164,7 @@ def predict_equivariant_3channel(checkpoint_dir, gpu='cuda', downsample = 3, cut
 
         img = batch['image'][0,...]
         label = batch['label']
-        output = model.predict_3D(torch.from_numpy(img.cpu().numpy()).float().cuda(),do_mirroring=False, patch_size=(128,128,128),
+        output = model.predict_3D(torch.from_numpy(img.numpy()).float().cuda(),do_mirroring=False, patch_size=(128,128,128),
                                 use_sliding_window=True, use_gaussian = True,verbose=False)
 
         pred_file_name = sav_dir+os.path.basename(batch['name'][0])+f'_pred.nii.gz'
@@ -182,7 +182,7 @@ def predict_equivariant_3channel(checkpoint_dir, gpu='cuda', downsample = 3, cut
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
 def three_channel_experiments(checkpoint_dir,downsample,gpu):
-    train_equivariant_3channel(checkpoint_dir,200,'right',downsample=downsample,gpu=gpu,n=2)
+    #train_equivariant_3channel(checkpoint_dir,200,'right',downsample=downsample,gpu=gpu,n=2)
     predict_equivariant_3channel(checkpoint_dir,gpu,downsample=downsample,n=2)
 
-three_channel_experiments('/home/diaz/experiments/INSTANCE2022_3channel/',3,'cuda')
+three_channel_experiments('/home/diaz/experiments/INSTANCE2022_3channel',3,'cuda')
