@@ -104,7 +104,7 @@ class INSTANCE_2022(Dataset):
                 patchFound = True
             else:
                 if (output_label == 1).sum() == 0:
-                    print('missing label. applying new random patch')
+                    #print('missing label. applying new random patch')
                     tries += 1
                 else:
                     patchFound = True
@@ -219,7 +219,7 @@ class INSTANCE_2022_3channels(Dataset):
                 patchFound = True
             else:
                 if (output_label == 1).sum() == 0:
-                    print('missing label. applying new random patch')
+                    #print('missing label. applying new random patch')
                     tries += 1
                 else:
                     patchFound = True
