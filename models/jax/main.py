@@ -67,6 +67,9 @@ def main():
     parser.add_argument(
         "--augmentation_deformation", type=float, default=0.0, help="Probability to add deformation augmentation"
     )
+    parser.add_argument(
+        "--deformation_temperature", type=float, default=2e-4, help="Temperature of the deformation augmentation"
+    )
     parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
     args = parser.parse_args()
 

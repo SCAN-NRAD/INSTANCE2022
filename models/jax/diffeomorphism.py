@@ -89,7 +89,7 @@ def remap(image, dx, dy, interpolation="linear"):
 
 
 @partial(jax.jit, static_argnums=(2, 4))
-def deform(image, T, num_modes, rng_key, interpolation="linear"):
+def deform(image, temperature, num_modes, rng_key, interpolation="linear"):
     """
     Args:
         image: image(s) [..., y, x]
@@ -110,19 +110,19 @@ def deform(image, T, num_modes, rng_key, interpolation="linear"):
     key_u, key_v = jax.random.split(rng_key)
     u = scalar_field(size, num_modes, key_u)  # [size,size]
     v = scalar_field(size, num_modes, key_v)  # [size,size]
-    dx = jnp.sqrt(T) * size * u
-    dy = jnp.sqrt(T) * size * v
+    dx = jnp.sqrt(temperature) * size * u
+    dy = jnp.sqrt(temperature) * size * v
 
     # Apply tau
     return remap(image, dx, dy, interpolation)
 
 
-def displacement_from_temperature(T, num_modes, size):
-    return 0.5 * size * jnp.sqrt(jnp.pi * T * jnp.log(num_modes))
+def displacement_from_temperature(temperature, num_modes, size):
+    return 0.5 * size * jnp.sqrt(jnp.pi * temperature * jnp.log(num_modes))
 
 
-def temperature_from_displacement(delta, num_modes, size):
-    return (2 * delta) ** 2 / (jnp.pi * size**2 * jnp.log(num_modes))
+def temperature_from_displacement(displacement, num_modes, size):
+    return (2 * displacement) ** 2 / (jnp.pi * size**2 * jnp.log(num_modes))
 
 
 def temperature_range(size, num_modes):

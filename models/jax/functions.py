@@ -23,7 +23,7 @@ def noise_mri(rng, img):
 
 
 @jax.jit
-def deform_mri(rng, img):
+def deform_mri(rng, img, temperature):
     r"""Apply a diffeomorphism to an MRI image.
     Apply the same deformation to all slices of the image.
 
@@ -35,7 +35,7 @@ def deform_mri(rng, img):
         The deformed image.
     """
     assert img.shape[0] == img.shape[1]
-    f = lambda i: deform(i, 2e-4, 5, rng, "nearest")
+    f = lambda i: deform(i, temperature, 5, rng, "nearest")
     for _ in range(img.ndim - 2):
         f = jax.vmap(f, -1, -1)
     return f(img)
@@ -196,8 +196,8 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         img = noise_mri(rng[1], img)
 
     if jax.random.uniform(rng[2]) < args.augmentation_deformation:
-        img = deform_mri(rng[3], img)
-        lab = deform_mri(rng[3], lab[..., np.newaxis])[..., 0]
+        img = deform_mri(rng[3], img, args.deformation_temperature)
+        lab = deform_mri(rng[3], lab[..., np.newaxis], args.deformation_temperature)[..., 0]
         lab = jnp.round(lab)
 
     # regroup zooms and sizes by rounding and taking subsets of the volume
