@@ -266,7 +266,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
                 lambda x: apply_model(w, x, zooms),
                 overlap=1.0,
             )
-            c[j] = np.array(confusion_matrix(unpad(lab, sample_padding), unpad(test_pred, sample_padding)))
+            c[j] = np.array(confusion_matrix(lab, test_pred))
 
         with np.errstate(invalid="ignore"):
             dice = 2 * c[:, 1, 1] / (2 * c[:, 1, 1] + c[:, 1, 0] + c[:, 0, 1])
