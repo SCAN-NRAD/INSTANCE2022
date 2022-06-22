@@ -236,9 +236,11 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
 
     state.losses[step % len(state.train_set)] = train_loss
 
+    time_str = time.strftime("%H:%M", time.localtime())
     print(
         (
             f"{wandb.run.dir.split('/')[-2]} "
+            f"[{time_str}] "
             f"[{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
             f"train[ loss={np.mean(state.losses):.4f} "
             f"LR={lr:.1e} "
