@@ -61,6 +61,35 @@ def load_miccai22(path: str, i: int) -> Tuple[np.ndarray, np.ndarray, Tuple[floa
     return image, label, zooms
 
 
+def round_mantissa(x, n):
+    """Round number
+
+    Args:
+        x: number to round
+        n: number of mantissa digits to keep
+
+    Returns:
+        rounded number
+
+    Example:
+        >>> round_mantissa(0.5 + 0.25 + 0.125, 0)
+        1.0
+
+        >>> round_mantissa(0.5 + 0.25 + 0.125, 2)
+        0.875
+    """
+    if x == 0:
+        return 0
+    s = 1 if x >= 0 else -1
+    x = abs(x)
+    a = math.floor(math.log2(x))
+    x = x / 2**a
+    assert 1.0 <= x < 2.0, x
+    x = round(x * 2**n) / 2**n
+    x = x * 2**a
+    return s * x
+
+
 def random_slice(size: int, target_size: int) -> slice:
     if size <= target_size:
         return slice(None)
@@ -160,7 +189,6 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
     test_sample_size = np.array([200, 200, 25])
     for i in test_idx:
         img, lab, zooms = load_miccai22(args.data, i)  # test data
-        zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
         center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
         start = np.maximum(center_of_mass - test_sample_size // 2, 0)
         end = np.minimum(start + test_sample_size, np.array(img.shape[:3]))
@@ -204,7 +232,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
         lab = jnp.round(lab)
 
     # regroup zooms and sizes by rounding and taking subsets of the volume
-    zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
+    zooms = jax.tree_map(lambda x: round_mantissa(x, 4), zooms)
     if np.random.rand() < 0.5:
         # avoid patch without label
         while True:
@@ -263,6 +291,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
     if step % 100 == 0:
         c = np.zeros((len(state.test_set), 2, 2))
         for j, (img, lab, zooms) in enumerate(state.test_set):
+            zooms = jax.tree_map(lambda x: round_mantissa(x, 4), zooms)
             test_pred = eval_model(
                 img,
                 lambda x: apply_model(w, x, zooms),
