@@ -179,7 +179,11 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
     )
 
 
-def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_model) -> TrainState:
+sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
+sample_padding = (16, 16, 1)
+
+
+def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model) -> TrainState:
     t0 = time.perf_counter()
     t_extra = t0 - state.t4
 
@@ -187,7 +191,6 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         jax.profiler.start_trace(wandb.run.dir)
 
     img, lab, zooms = state.train_set[step % len(state.train_set)]
-    sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
 
     # data augmentation
     rng = jax.random.split(jax.random.PRNGKey(step), 4)
@@ -206,7 +209,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         # avoid patch without label
         while True:
             x, y = random_sample(img, lab, sample_size)
-            if np.any(un(y) == 1):
+            if np.any(unpad(y, sample_padding) == 1):
                 img, lab = x, y
                 break
     else:
@@ -221,11 +224,11 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
     t1 = time.perf_counter()
 
     lr = args.lr * max(0.1 ** math.floor(step / args.lr_div_step), 0.1)
-    w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr)
+    w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr, sample_padding)
     train_loss.block_until_ready()
 
     t2 = time.perf_counter()
-    c = np.array(confusion_matrix(un(lab), un(train_pred)))
+    c = np.array(confusion_matrix(unpad(lab, sample_padding), unpad(train_pred, sample_padding)))
     with np.errstate(invalid="ignore"):
         train_dice = 2 * c[1, 1] / (2 * c[1, 1] + c[1, 0] + c[0, 1])
 
@@ -261,11 +264,9 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
             test_pred = eval_model(
                 img,
                 lambda x: apply_model(w, x, zooms),
-                sample_size,
-                pads=(16, 16, 1),
                 overlap=1.0,
             )
-            c[j] = np.array(confusion_matrix(un(lab), un(test_pred)))
+            c[j] = np.array(confusion_matrix(unpad(lab, sample_padding), unpad(test_pred, sample_padding)))
 
         with np.errstate(invalid="ignore"):
             dice = 2 * c[:, 1, 1] / (2 * c[:, 1, 1] + c[:, 1, 0] + c[:, 0, 1])
@@ -360,18 +361,23 @@ def patch_slices(total: int, size: int, pad: int, overlap: float) -> List[int]:
 def eval_model(
     img: jnp.ndarray,
     apply: Callable[[jnp.ndarray], jnp.ndarray],
-    size: Tuple[int, int, int],
-    pads: Tuple[int, int, int],
     overlap: float,
+    size: Tuple[int, int, int] = None,
+    padding: Tuple[int, int, int] = None,
     verbose: bool = False,
 ) -> np.ndarray:
     assert img.ndim == 3 + 1
 
+    if size is None:
+        size = sample_size
+    if padding is None:
+        padding = sample_padding
+
     pos = np.stack(
         np.meshgrid(
-            np.linspace(-1.3, 1.3, size[0] - 2 * pads[0]),
-            np.linspace(-1.3, 1.3, size[1] - 2 * pads[1]),
-            np.linspace(-1.3, 1.3, size[2] - 2 * pads[2]),
+            np.linspace(-1.3, 1.3, size[0] - 2 * padding[0]),
+            np.linspace(-1.3, 1.3, size[1] - 2 * padding[1]),
+            np.linspace(-1.3, 1.3, size[2] - 2 * padding[2]),
             indexing="ij",
         ),
         axis=-1,
@@ -381,24 +387,24 @@ def eval_model(
     sum = np.zeros_like(img[:, :, :, 0])
     num = np.zeros_like(img[:, :, :, 0])
 
-    for i in patch_slices(img.shape[0], size[0], pads[0], overlap):
-        for j in patch_slices(img.shape[1], size[1], pads[1], overlap):
-            for k in patch_slices(img.shape[2], size[2], pads[2], overlap):
+    for i in patch_slices(img.shape[0], size[0], padding[0], overlap):
+        for j in patch_slices(img.shape[1], size[1], padding[1], overlap):
+            for k in patch_slices(img.shape[2], size[2], padding[2], overlap):
                 x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
                 p = apply(x)
-                p = unpad(p, pads)
+                p = unpad(p, padding)
 
                 sum[
-                    i + pads[0] : i + size[0] - pads[0],
-                    j + pads[1] : j + size[1] - pads[1],
-                    k + pads[2] : k + size[2] - pads[2],
+                    i + padding[0] : i + size[0] - padding[0],
+                    j + padding[1] : j + size[1] - padding[1],
+                    k + padding[2] : k + size[2] - padding[2],
                 ] += (
                     p * gaussian
                 )
                 num[
-                    i + pads[0] : i + size[0] - pads[0],
-                    j + pads[1] : j + size[1] - pads[1],
-                    k + pads[2] : k + size[2] - pads[2],
+                    i + padding[0] : i + size[0] - padding[0],
+                    j + padding[1] : j + size[1] - padding[1],
+                    k + padding[2] : k + size[2] - padding[2],
                 ] += gaussian
 
                 if verbose:

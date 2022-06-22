@@ -41,7 +41,7 @@ def main():
         print(f"Evaluating run {idx}", flush=True)
         img, lab, zooms = load_miccai22(args.data, idx)
         zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
-        pred = eval_model(img, lambda x: apply(w, x, zooms), (100, 100, 25), (16, 16, 1), 2.0, True)
+        pred = eval_model(img, lambda x: apply(w, x, zooms), 2.0, True)
         print(flush=True)
 
         original = nib.load(f"{args.data}/label/{idx:03d}.nii.gz")
