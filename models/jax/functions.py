@@ -179,8 +179,8 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
     )
 
 
-sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
-sample_padding = (16, 16, 1)
+sample_size = (144, 144, 13)  # physical size ~= 65mm ^ 3
+sample_padding = (22, 22, 2)  # 10mm of border removed
 
 
 def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model) -> TrainState:
