@@ -103,9 +103,6 @@ def main():
         w = model.init(jax.random.PRNGKey(args.seed_init), img[:100, :100, :25], zooms)
         print(f"Initialized model in {functions.format_time(time.perf_counter() - t)}", flush=True)
 
-    def un(img):
-        return functions.unpad(img, (16, 16, 1))
-
     def opt(lr):
         if args.optimizer == "adam":
             return optax.adam(lr)
@@ -116,8 +113,8 @@ def main():
     def apply_model(w, x, zooms):
         return model.apply(w, x, zooms)
 
-    @partial(jax.jit, static_argnums=(4,))
-    def update(w, opt_state, x, y, zooms, lr):
+    @partial(jax.jit, static_argnums=(4, 6))
+    def update(w, opt_state, x, y, zooms, lr, pads):
         r"""Update the model parameters.
 
         Args:
@@ -137,6 +134,8 @@ def main():
         """
         assert x.ndim == 3 + 1
         assert y.ndim == 3
+
+        un = lambda x: functions.unpad(x, pads)
 
         def h(w, x, y):
             p = model.apply(w, x, zooms)
@@ -165,7 +164,7 @@ def main():
             state = functions.init_train_loop(args, state, step, w, opt_state)
             print("Continue main loop...", flush=True)
 
-        state, w, opt_state = functions.train_loop(args, state, step, w, opt_state, un, update, apply_model)
+        state, w, opt_state = functions.train_loop(args, state, step, w, opt_state, update, apply_model)
 
 
 if __name__ == "__main__":

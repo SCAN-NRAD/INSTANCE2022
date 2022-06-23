@@ -61,6 +61,35 @@ def load_miccai22(path: str, i: int) -> Tuple[np.ndarray, np.ndarray, Tuple[floa
     return image, label, zooms
 
 
+def round_mantissa(x, n):
+    """Round number
+
+    Args:
+        x: number to round
+        n: number of mantissa digits to keep
+
+    Returns:
+        rounded number
+
+    Example:
+        >>> round_mantissa(0.5 + 0.25 + 0.125, 0)
+        1.0
+
+        >>> round_mantissa(0.5 + 0.25 + 0.125, 2)
+        0.875
+    """
+    if x == 0:
+        return 0
+    s = 1 if x >= 0 else -1
+    x = abs(x)
+    a = math.floor(math.log2(x))
+    x = x / 2**a
+    assert 1.0 <= x < 2.0, x
+    x = round(x * 2**n) / 2**n
+    x = x * 2**a
+    return s * x
+
+
 def random_slice(size: int, target_size: int) -> slice:
     if size <= target_size:
         return slice(None)
@@ -160,7 +189,6 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
     test_sample_size = np.array([200, 200, 25])
     for i in test_idx:
         img, lab, zooms = load_miccai22(args.data, i)  # test data
-        zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
         center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
         start = np.maximum(center_of_mass - test_sample_size // 2, 0)
         end = np.minimum(start + test_sample_size, np.array(img.shape[:3]))
@@ -179,7 +207,15 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
     )
 
 
-def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_model) -> TrainState:
+sample_size = (144, 144, 13)  # physical size ~= 65mm ^ 3
+sample_padding = (22, 22, 2)  # 10mm of border removed
+
+
+def round_zooms(zooms: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    return jax.tree_map(lambda x: round_mantissa(x, 4), zooms)
+
+
+def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model) -> TrainState:
     t0 = time.perf_counter()
     t_extra = t0 - state.t4
 
@@ -187,7 +223,6 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         jax.profiler.start_trace(wandb.run.dir)
 
     img, lab, zooms = state.train_set[step % len(state.train_set)]
-    sample_size = (100, 100, 25)  # physical size ~= 50mm x 50mm x 125mm
 
     # data augmentation
     rng = jax.random.split(jax.random.PRNGKey(step), 4)
@@ -201,12 +236,12 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
         lab = jnp.round(lab)
 
     # regroup zooms and sizes by rounding and taking subsets of the volume
-    zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
+    zooms = round_zooms(zooms)
     if np.random.rand() < 0.5:
         # avoid patch without label
         while True:
             x, y = random_sample(img, lab, sample_size)
-            if np.any(un(y) == 1):
+            if np.any(unpad(y, sample_padding) == 1):
                 img, lab = x, y
                 break
     else:
@@ -221,11 +256,11 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
     t1 = time.perf_counter()
 
     lr = args.lr * max(0.1 ** math.floor(step / args.lr_div_step), 0.1)
-    w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr)
+    w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr, sample_padding)
     train_loss.block_until_ready()
 
     t2 = time.perf_counter()
-    c = np.array(confusion_matrix(un(lab), un(train_pred)))
+    c = np.array(confusion_matrix(unpad(lab, sample_padding), unpad(train_pred, sample_padding)))
     with np.errstate(invalid="ignore"):
         train_dice = 2 * c[1, 1] / (2 * c[1, 1] + c[1, 0] + c[0, 1])
 
@@ -233,17 +268,13 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
 
     state.losses[step % len(state.train_set)] = train_loss
 
+    time_str = time.strftime("%H:%M", time.localtime())
     print(
         (
             f"{wandb.run.dir.split('/')[-2]} "
-            f"[{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
-            f"train[ loss={np.mean(state.losses):.4f} "
-            f"LR={lr:.1e} "
-            f"dice={100 * train_dice:02.0f} ] "
-            f"time[ "
-            f"S{format_time(t1 - t0)}+"
-            f"U{format_time(t2 - t1)}+"
-            f"EX{format_time(t_extra)} ]"
+            f"[{time_str}] [{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
+            f"train[ loss={np.mean(state.losses):.4f} LR={lr:.1e} dice={100 * train_dice:02.0f} ] "
+            f"time[ S{format_time(t1 - t0)}+U{format_time(t2 - t1)}+EX{format_time(t_extra)} ]"
         ),
         flush=True,
     )
@@ -258,14 +289,9 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
     if step % 100 == 0:
         c = np.zeros((len(state.test_set), 2, 2))
         for j, (img, lab, zooms) in enumerate(state.test_set):
-            test_pred = eval_model(
-                img,
-                lambda x: apply_model(w, x, zooms),
-                sample_size,
-                pads=(16, 16, 1),
-                overlap=1.0,
-            )
-            c[j] = np.array(confusion_matrix(un(lab), un(test_pred)))
+            zooms = round_zooms(zooms)
+            test_pred = eval_model(img, lambda x: apply_model(w, x, zooms))
+            c[j] = np.array(confusion_matrix(lab, test_pred))
 
         with np.errstate(invalid="ignore"):
             dice = 2 * c[:, 1, 1] / (2 * c[:, 1, 1] + c[:, 1, 0] + c[:, 0, 1])
@@ -285,14 +311,13 @@ def train_loop(args, state: TrainState, step, w, opt_state, un, update, apply_mo
 
         t4 = time.perf_counter()
 
+        time_str = time.strftime("%H:%M", time.localtime())
         print(
             (
                 f"{wandb.run.dir.split('/')[-2]} "
-                f"[{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
-                f"test[ dice={dice_txt} "
-                f"best_sorted_dices={best_dice_txt}] "
-                f"time[ "
-                f"E{format_time(t4 - t2)} ]"
+                f"[{time_str}] [{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
+                f"test[ dice={dice_txt} best_sorted_dices={best_dice_txt} ] "
+                f"time[ E{format_time(t4 - t2)} ]"
             ),
             flush=True,
         )
@@ -360,18 +385,24 @@ def patch_slices(total: int, size: int, pad: int, overlap: float) -> List[int]:
 def eval_model(
     img: jnp.ndarray,
     apply: Callable[[jnp.ndarray], jnp.ndarray],
-    size: Tuple[int, int, int],
-    pads: Tuple[int, int, int],
-    overlap: float,
+    *,
+    overlap: float = 1.0,
+    size: Tuple[int, int, int] = None,
+    padding: Tuple[int, int, int] = None,
     verbose: bool = False,
 ) -> np.ndarray:
     assert img.ndim == 3 + 1
 
+    if size is None:
+        size = sample_size
+    if padding is None:
+        padding = sample_padding
+
     pos = np.stack(
         np.meshgrid(
-            np.linspace(-1.3, 1.3, size[0] - 2 * pads[0]),
-            np.linspace(-1.3, 1.3, size[1] - 2 * pads[1]),
-            np.linspace(-1.3, 1.3, size[2] - 2 * pads[2]),
+            np.linspace(-1.3, 1.3, size[0] - 2 * padding[0]),
+            np.linspace(-1.3, 1.3, size[1] - 2 * padding[1]),
+            np.linspace(-1.3, 1.3, size[2] - 2 * padding[2]),
             indexing="ij",
         ),
         axis=-1,
@@ -381,24 +412,24 @@ def eval_model(
     sum = np.zeros_like(img[:, :, :, 0])
     num = np.zeros_like(img[:, :, :, 0])
 
-    for i in patch_slices(img.shape[0], size[0], pads[0], overlap):
-        for j in patch_slices(img.shape[1], size[1], pads[1], overlap):
-            for k in patch_slices(img.shape[2], size[2], pads[2], overlap):
+    for i in patch_slices(img.shape[0], size[0], padding[0], overlap):
+        for j in patch_slices(img.shape[1], size[1], padding[1], overlap):
+            for k in patch_slices(img.shape[2], size[2], padding[2], overlap):
                 x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
                 p = apply(x)
-                p = unpad(p, pads)
+                p = unpad(p, padding)
 
                 sum[
-                    i + pads[0] : i + size[0] - pads[0],
-                    j + pads[1] : j + size[1] - pads[1],
-                    k + pads[2] : k + size[2] - pads[2],
+                    i + padding[0] : i + size[0] - padding[0],
+                    j + padding[1] : j + size[1] - padding[1],
+                    k + padding[2] : k + size[2] - padding[2],
                 ] += (
                     p * gaussian
                 )
                 num[
-                    i + pads[0] : i + size[0] - pads[0],
-                    j + pads[1] : j + size[1] - pads[1],
-                    k + pads[2] : k + size[2] - pads[2],
+                    i + padding[0] : i + size[0] - padding[0],
+                    j + padding[1] : j + size[1] - padding[1],
+                    k + padding[2] : k + size[2] - padding[2],
                 ] += gaussian
 
                 if verbose:

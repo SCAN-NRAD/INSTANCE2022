@@ -14,6 +14,8 @@ import jax
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a model")
     parser.add_argument("--path", type=str, default=".", help="Path to wandb run")
+    parser.add_argument("--weights", type=str, default="w.pkl", help="Relative path to weights")
+    parser.add_argument("--threshold", type=float, default=0.0, help="Threshold for segmentation")
     parser.add_argument("--data", type=str, default=".", help="Path to data")
     parser.add_argument("--indices", nargs="+", type=int, required=True, help="Indices of the runs to evaluate")
     args = parser.parse_args()
@@ -21,7 +23,7 @@ def main():
     print(args.path, flush=True)
     sys.path.insert(0, args.path)
     import model  # noqa: F401
-    from functions import load_miccai22, eval_model  # noqa: F401
+    from functions import load_miccai22, round_zooms, eval_model  # noqa: F401
 
     # Load model args
     with open(f"{args.path}/args.pkl", "rb") as f:
@@ -32,7 +34,7 @@ def main():
     def apply(w, x, zooms):
         return hk.without_apply_rng(hk.transform(model.unet_with_groups(train_args))).apply(w, x, zooms)
 
-    with open(f"{args.path}/best_w.pkl", "rb") as f:
+    with open(f"{args.path}/{args.weights}", "rb") as f:
         w = pickle.load(f)
 
     collect_metrics = []
@@ -40,8 +42,8 @@ def main():
     for idx in args.indices:
         print(f"Evaluating run {idx}", flush=True)
         img, lab, zooms = load_miccai22(args.data, idx)
-        zooms = jax.tree_map(lambda x: round(433 * x) / 433, zooms)
-        pred = eval_model(img, lambda x: apply(w, x, zooms), (100, 100, 25), (16, 16, 1), 2.0, True)
+        zooms = round_zooms(zooms)
+        pred = eval_model(img, lambda x: apply(w, x, zooms), overlap=2.0, verbose=True)
         print(flush=True)
 
         original = nib.load(f"{args.data}/label/{idx:03d}.nii.gz")
@@ -50,7 +52,7 @@ def main():
         img = nib.Nifti1Image(pred, original.affine, original.header)
         nib.save(img, f"{args.path}/eval{idx:03d}.nii.gz")
 
-        y_pred = (np.sign(pred) + 1) / 2
+        y_pred = (np.sign(pred - args.threshold) + 1) / 2
         four_classes = 2 * y_gt + y_pred
         img = nib.Nifti1Image(four_classes, original.affine, original.header)
         nib.save(img, f"{args.path}/confusion{idx:03d}.nii.gz")
