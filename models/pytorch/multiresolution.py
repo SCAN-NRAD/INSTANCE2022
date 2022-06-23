@@ -295,4 +295,4 @@ def multiresolution_experiments(checkpoint_dir,downsample,gpu):
     train_val_multiresolution(checkpoint_dir,200, n=3)
     predict_multiresolution(checkpoint_dir,n=3)
 
-multiresolution_experiments('/home/diaz/experiments/INSTANCE2022',3,'cuda')
+multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution/',3,'cuda')
