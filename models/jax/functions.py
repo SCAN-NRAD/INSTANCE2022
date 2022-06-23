@@ -211,6 +211,10 @@ sample_size = (144, 144, 13)  # physical size ~= 65mm ^ 3
 sample_padding = (22, 22, 2)  # 10mm of border removed
 
 
+def round_zooms(zooms: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    return jax.tree_map(lambda x: round_mantissa(x, 4), zooms)
+
+
 def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model) -> TrainState:
     t0 = time.perf_counter()
     t_extra = t0 - state.t4
@@ -232,7 +236,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
         lab = jnp.round(lab)
 
     # regroup zooms and sizes by rounding and taking subsets of the volume
-    zooms = jax.tree_map(lambda x: round_mantissa(x, 4), zooms)
+    zooms = round_zooms(zooms)
     if np.random.rand() < 0.5:
         # avoid patch without label
         while True:
@@ -268,15 +272,9 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
     print(
         (
             f"{wandb.run.dir.split('/')[-2]} "
-            f"[{time_str}] "
-            f"[{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
-            f"train[ loss={np.mean(state.losses):.4f} "
-            f"LR={lr:.1e} "
-            f"dice={100 * train_dice:02.0f} ] "
-            f"time[ "
-            f"S{format_time(t1 - t0)}+"
-            f"U{format_time(t2 - t1)}+"
-            f"EX{format_time(t_extra)} ]"
+            f"[{time_str}] [{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
+            f"train[ loss={np.mean(state.losses):.4f} LR={lr:.1e} dice={100 * train_dice:02.0f} ] "
+            f"time[ S{format_time(t1 - t0)}+U{format_time(t2 - t1)}+EX{format_time(t_extra)} ]"
         ),
         flush=True,
     )
@@ -291,12 +289,8 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
     if step % 100 == 0:
         c = np.zeros((len(state.test_set), 2, 2))
         for j, (img, lab, zooms) in enumerate(state.test_set):
-            zooms = jax.tree_map(lambda x: round_mantissa(x, 4), zooms)
-            test_pred = eval_model(
-                img,
-                lambda x: apply_model(w, x, zooms),
-                overlap=1.0,
-            )
+            zooms = round_zooms(zooms)
+            test_pred = eval_model(img, lambda x: apply_model(w, x, zooms))
             c[j] = np.array(confusion_matrix(lab, test_pred))
 
         with np.errstate(invalid="ignore"):
@@ -317,14 +311,13 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
 
         t4 = time.perf_counter()
 
+        time_str = time.strftime("%H:%M", time.localtime())
         print(
             (
                 f"{wandb.run.dir.split('/')[-2]} "
-                f"[{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
-                f"test[ dice={dice_txt} "
-                f"best_sorted_dices={best_dice_txt}] "
-                f"time[ "
-                f"E{format_time(t4 - t2)} ]"
+                f"[{time_str}] [{step:04d}:{format_time(time.perf_counter() - state.time0)}] "
+                f"test[ dice={dice_txt} best_sorted_dices={best_dice_txt} ] "
+                f"time[ E{format_time(t4 - t2)} ]"
             ),
             flush=True,
         )
@@ -392,7 +385,8 @@ def patch_slices(total: int, size: int, pad: int, overlap: float) -> List[int]:
 def eval_model(
     img: jnp.ndarray,
     apply: Callable[[jnp.ndarray], jnp.ndarray],
-    overlap: float,
+    *,
+    overlap: float = 1.0,
     size: Tuple[int, int, int] = None,
     padding: Tuple[int, int, int] = None,
     verbose: bool = False,
