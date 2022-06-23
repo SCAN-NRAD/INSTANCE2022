@@ -49,7 +49,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
         os.makedirs(checkpoint_path)
     log_name = os.path.join(checkpoint_path,'train.log')
 
-    writer = SummaryWriter(log_name)
+    writer = SummaryWriter(checkpoint_path)
 
     training_cases = 'training_cases.txt'
 
