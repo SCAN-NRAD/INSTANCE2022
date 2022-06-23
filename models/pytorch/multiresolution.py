@@ -90,7 +90,8 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
             labels = batch['label']
             affine = batch['affine']
 
-            resolution = tuple(np.round(np.abs(affine.diagonal()[:3]),decimals=3))
+            resolution = tuple(np.round(np.abs(affine.numpy()[0].diagonal()[:3]),decimals=3))
+            print('resolution:',resolution)
             imgs = imgs.to(device=device, dtype=torch.float32)
             labels = labels.to(device=device, dtype=torch.long)
 
@@ -148,7 +149,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
             imgs, true_masks = batch['image'], batch['label']
             affine = batch['affine']
-            resolution = tuple(np.round(np.abs(affine.diagonal()[:3]),decimals=3))
+            resolution = tuple(np.round(np.abs(affine.numpy()[0].diagonal()[:3]),decimals=3))
             imgs = imgs.to(device=device, dtype=torch.float32)
             true_masks = true_masks.to(device=device, dtype=mask_type)
 
@@ -263,7 +264,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
         img = batch['image'][0,...]
         label = batch['label']
         affine = batch['affine']
-        resolution = tuple(np.round(np.abs(affine.diagonal()[:3]),decimals=3))
+        resolution = tuple(np.round(np.abs(affine.numpy()[0].diagonal()[:3]),decimals=3))
 
         input_irreps = "3x0e"
         model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
