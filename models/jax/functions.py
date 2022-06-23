@@ -1,8 +1,8 @@
 import math
 import pickle
-import random
 import time
 from collections import namedtuple
+from functools import partial
 from typing import Callable, List, Tuple
 
 import nibabel as nib
@@ -90,18 +90,22 @@ def round_mantissa(x, n):
     return s * x
 
 
-def random_slice(size: int, target_size: int) -> slice:
+def random_slice(rng: jnp.ndarray, size: int, target_size: int) -> slice:
     if size <= target_size:
-        return slice(None)
-    start = random.randint(0, size - target_size)
-    return slice(start, start + target_size)
+        return 0
+    start = jax.random.randint(rng, (), 0, size - target_size)
+    return start
 
 
-def random_sample(x: np.ndarray, y: np.ndarray, target_sizes: Tuple[int, int, int]) -> Tuple[np.ndarray, np.ndarray]:
-    slices = jax.tree_map(random_slice, x.shape[:3], target_sizes)
-    sx = x[slices[0], slices[1], slices[2]]
-    sy = y[slices[0], slices[1], slices[2]]
-    return sx, sy
+@partial(jax.jit, static_argnums=(2,))
+def random_sample(
+    rng: jnp.ndarray, x: jnp.ndarray, target_sizes: Tuple[int, int, int]
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    rng = jax.random.split(rng, 4)
+    starts = jax.tree_map(random_slice, tuple(rng[:3]), x.shape[:3], target_sizes)
+    starts = starts + (0,) * (x.ndim - 3)
+    target_sizes = target_sizes + x.shape[3:]
+    return jax.lax.dynamic_slice(x, starts, target_sizes), rng[3]
 
 
 def format_time(seconds: float) -> str:
@@ -169,6 +173,7 @@ TrainState = namedtuple(
         "t4",
         "losses",
         "best_sorted_dices",
+        "rng",
     ],
 )
 
@@ -204,6 +209,7 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
         t4=time.perf_counter(),
         losses=getattr(old_state, "losses", np.ones((len(train_set),))),
         best_sorted_dices=getattr(old_state, "best_sorted_dices", np.zeros((len(test_set),))),
+        rng=getattr(old_state, "rng", jax.random.PRNGKey(args.seed_train)),
     )
 
 
@@ -213,6 +219,11 @@ sample_padding = (22, 22, 2)  # 10mm of border removed
 
 def round_zooms(zooms: Tuple[float, float, float]) -> Tuple[float, float, float]:
     return jax.tree_map(lambda x: round_mantissa(x, 4), zooms)
+
+
+@partial(jax.jit, static_argnums=(1,))
+def random_split(rng: jnp.ndarray, n: int) -> jnp.ndarray:
+    return jax.random.split(rng, n)
 
 
 def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model) -> TrainState:
@@ -225,7 +236,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
     img, lab, zooms = state.train_set[step % len(state.train_set)]
 
     # data augmentation
-    rng = jax.random.split(jax.random.PRNGKey(step), 4)
+    rng = random_split(state.rng, 8)
 
     if jax.random.uniform(rng[0]) < args.augmentation_noise:
         img = noise_mri(rng[1], img)
@@ -237,21 +248,27 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
 
     # regroup zooms and sizes by rounding and taking subsets of the volume
     zooms = round_zooms(zooms)
-    if np.random.rand() < 0.5:
+    if jax.random.uniform(rng[4]) < 0.5:
         # avoid patch without label
+        r = rng[5]
         while True:
-            x, y = random_sample(img, lab, sample_size)
+            x, _ = random_sample(r, img, sample_size)
+            y, r = random_sample(r, lab, sample_size)
             if np.any(unpad(y, sample_padding) == 1):
                 img, lab = x, y
                 break
     else:
         # avoid patch full of air
+        r = rng[6]
         while True:
-            x, y = random_sample(img, lab, sample_size)
+            x, _ = random_sample(r, img, sample_size)
+            y, r = random_sample(r, lab, sample_size)
             if np.any(x > 0.0):
                 img, lab = x, y
                 break
     del x, y
+
+    rng = rng[7]
 
     t1 = time.perf_counter()
 
@@ -363,6 +380,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
         t4=t4,
         losses=state.losses,
         best_sorted_dices=state.best_sorted_dices,
+        rng=rng,
     )
     return (state, w, opt_state)
 
