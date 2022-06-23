@@ -292,7 +292,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
 def multiresolution_experiments(checkpoint_dir,downsample,gpu):
-    train_val_multiresolution(checkpoint_dir, n=2)
-    predict_multiresolution(checkpoint_dir,n=2)
+    train_val_multiresolution(checkpoint_dir,200, n=3)
+    predict_multiresolution(checkpoint_dir,n=3)
 
 multiresolution_experiments('/home/diaz/experiments/INSTANCE2022',3,'cuda')
