@@ -234,6 +234,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
         jax.profiler.start_trace(wandb.run.dir)
 
     img, lab, zooms = state.train_set[step % len(state.train_set)]
+    img, lab = jax.device_put((img, lab))
 
     # data augmentation
     rng = random_split(state.rng, 8)
@@ -243,7 +244,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
 
     if jax.random.uniform(rng[2]) < args.augmentation_deformation:
         img = deform_mri(rng[3], img, args.deformation_temperature)
-        lab = deform_mri(rng[3], lab[..., np.newaxis], args.deformation_temperature)[..., 0]
+        lab = deform_mri(rng[3], lab, args.deformation_temperature)
         lab = jnp.round(lab)
 
     # regroup zooms and sizes by rounding and taking subsets of the volume

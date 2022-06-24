@@ -6,14 +6,22 @@ from functools import partial
 import haiku as hk
 import nibabel as nib
 import numpy as np
-from monai.metrics.hausdorff_distance import compute_hausdorff_distance
+
+try:
+    from monai.metrics.hausdorff_distance import compute_hausdorff_distance
+except ImportError:
+    print("Could not import monai.metrics.hausdorff_distance. Will return NaN for HD.")
+
+    def compute_hausdorff_distance(y_pred, y_gt):
+        return np.nan
+
 
 import jax
 
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a model")
-    parser.add_argument("--path", type=str, default=".", help="Path to wandb run")
+    parser.add_argument("--path", type=str, required=True, help="Path to wandb run")
     parser.add_argument("--weights", type=str, default="w.pkl", help="Relative path to weights")
     parser.add_argument("--threshold", type=float, default=0.0, help="Threshold for segmentation")
     parser.add_argument("--data", type=str, default=".", help="Path to data")
@@ -36,14 +44,14 @@ def main():
 
     with open(f"{args.path}/{args.weights}", "rb") as f:
         w = pickle.load(f)
+        w = jax.device_put(w)
 
     collect_metrics = []
 
     for idx in args.indices:
         print(f"Evaluating run {idx}", flush=True)
         img, lab, zooms = load_miccai22(args.data, idx)
-        zooms = round_zooms(zooms)
-        pred = eval_model(img, lambda x: apply(w, x, zooms), overlap=2.0, verbose=True)
+        pred = eval_model(img, lambda x: apply(w, x, round_zooms(zooms)), overlap=2.0, verbose=True)
         print(flush=True)
 
         original = nib.load(f"{args.data}/label/{idx:03d}.nii.gz")
@@ -65,7 +73,7 @@ def main():
         DSC = 2 * tp / (2 * tp + fp + fn)
         print(f"DSC (dice score): {DSC}", flush=True)
 
-        HD = compute_hausdorff_distance(y_pred[None, None], y_gt[None, None]).item()
+        HD = float(compute_hausdorff_distance(y_pred[None, None], y_gt[None, None]))
         print(f"HD (hausdorff distance): {HD}", flush=True)
 
         RVD = (tp + fp) / (tp + fn) - 1
