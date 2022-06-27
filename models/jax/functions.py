@@ -215,6 +215,7 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
 
 sample_size = (144, 144, 13)  # physical size ~= 65mm ^ 3
 sample_padding = (22, 22, 2)  # 10mm of border removed
+train_padding = (64, 64, 5)
 
 
 def round_zooms(zooms: Tuple[float, float, float]) -> Tuple[float, float, float]:
@@ -255,7 +256,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
         while True:
             x, _ = random_sample(r, img, sample_size)
             y, r = random_sample(r, lab, sample_size)
-            if np.any(unpad(y, sample_padding) == 1):
+            if np.any(unpad(y, train_padding) == 1):
                 img, lab = x, y
                 break
     else:
@@ -274,7 +275,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
     t1 = time.perf_counter()
 
     lr = args.lr * max(0.1 ** math.floor(step / args.lr_div_step), 0.1)
-    w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr, sample_padding)
+    w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr, train_padding)
     train_loss.block_until_ready()
 
     t2 = time.perf_counter()
