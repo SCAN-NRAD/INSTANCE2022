@@ -47,6 +47,7 @@ class INSTANCE_2022(Dataset):
         img = nib.load(img_file[0])
         label = nib.load(label_file[0])
         img_affine = img.affine
+        res = img.header.get_zooms()
 
         assert (img.affine.round() == label.affine.round()).prod(), \
             f'Image and label {idx} affines should be the same'
@@ -75,7 +76,8 @@ class INSTANCE_2022(Dataset):
             'image': img,
             'label': label,
             'name' : idx,
-            'affine': img_affine
+            'affine': img_affine,
+            'res': res
         }
 
     def random_patch(self,input_array,input_label,patch_size,check_labels=False):
@@ -147,6 +149,7 @@ class INSTANCE_2022_3channels(Dataset):
         img = nib.load(img_file[0])
         label = nib.load(label_file[0])
         img_affine = img.affine
+        res = img.header.get_zooms()
 
         assert (img.affine.round() == label.affine.round()).prod(), \
             f'Image and label {idx} affines should be the same'
@@ -190,7 +193,8 @@ class INSTANCE_2022_3channels(Dataset):
             'image': channels,
             'label': label,
             'name' : idx,
-            'affine': img_affine
+            'affine': img_affine,
+            'res': res
         }
 
     def random_patch(self,input_array,input_label,patch_size,check_labels=False):

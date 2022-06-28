@@ -42,7 +42,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
 
     batch_size = 1
-    patience = 15
+    patience = 200
     save_only_min = True
 
     if not os.path.exists(checkpoint_path):
@@ -89,8 +89,8 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
             imgs = batch['image']
             labels = batch['label']
             affine = batch['affine']
-
-            resolution = tuple(np.round(np.abs(affine.numpy()[0].diagonal()[:3]),decimals=3))
+            resolution = batch['res']
+            resolution = tuple([s.numpy()[0] for s in resolution])
             print('resolution:',resolution)
             imgs = imgs.to(device=device, dtype=torch.float32)
             labels = labels.to(device=device, dtype=torch.long)
@@ -149,7 +149,8 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
             imgs, true_masks = batch['image'], batch['label']
             affine = batch['affine']
-            resolution = tuple(np.round(np.abs(affine.numpy()[0].diagonal()[:3]),decimals=3))
+            resolution = batch['res']
+            resolution = tuple([s.numpy()[0] for s in resolution])
             imgs = imgs.to(device=device, dtype=torch.float32)
             true_masks = true_masks.to(device=device, dtype=mask_type)
 
@@ -220,7 +221,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
                         'model_state_dict': model.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
                         'loss': ce_loss,
-                        'params':model.parameters(),
+                        'resolution': resolution,
                         }, f'{checkpoint_path}/model_{epoch:03}.pt')
         
         elif save_only_min and min_loss:
@@ -230,7 +231,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
                         'model_state_dict': model.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
                         'loss': ce_loss,
-                        'params':model.parameters(),
+                        'resolution': resolution,
                         }, f'{checkpoint_path}/model_min.pt')
         
         min_loss = False
@@ -255,7 +256,12 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
     device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
 
     checkpoint = torch.load(checkpoint_dir+'/model_min.pt',map_location=gpu)
-    prev_model_params = checkpoint['params']
+    resolution=checkpoint['resolution']
+    input_irreps = "3x0e"
+    model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    prev_model_params = model.parameters()
+
 
     dc_array = np.zeros((len(dataset),n_classes))
     
@@ -264,9 +270,9 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
         img = batch['image'][0,...]
         label = batch['label']
         affine = batch['affine']
-        resolution = tuple(np.round(np.abs(affine.numpy()[0].diagonal()[:3]),decimals=3))
+        resolution = batch['res']
+        resolution = tuple([s.numpy()[0] for s in resolution])
 
-        input_irreps = "3x0e"
         model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
 
         for p1, p2 in zip(prev_model_params, model.parameters()):
@@ -293,7 +299,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
 def multiresolution_experiments(checkpoint_dir,downsample,gpu):
-    train_val_multiresolution(checkpoint_dir,200, n=3)
+    train_val_multiresolution(checkpoint_dir,1000, n=3)
     predict_multiresolution(checkpoint_dir,n=3)
 
-multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution/',3,'cuda')
+multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_2/',3,'cuda')
