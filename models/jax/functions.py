@@ -220,7 +220,7 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
 
 sample_size = (144, 144, 13)  # physical size ~= 65mm ^ 3
 sample_padding = (22, 22, 2)  # 10mm of border removed
-train_padding = (64, 64, 5)
+train_padding = sample_padding
 
 
 def round_zooms(zooms: Tuple[float, float, float]) -> Tuple[float, float, float]:
