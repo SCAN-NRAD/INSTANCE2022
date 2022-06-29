@@ -8,3 +8,4 @@ foo.py
 *.nii.gz
 *.png
 *.gif
+.Dockerfile.swp

@@ -41,6 +41,14 @@ def deform_mri(rng, img, temperature):
     return f(img)
 
 
+def preprocess_miccai22_image(image: np.ndarray):
+    bone = 0.005 * np.clip(image, a_min=0.0, a_max=1000.0).astype(np.float32)
+    range1 = 0.03 * np.clip(image, a_min=0.0, a_max=80.0).astype(np.float32)
+    range2 = 0.013 * np.clip(image, a_min=-50.0, a_max=220.0).astype(np.float32)
+    image = np.stack([bone, range1, range2], axis=-1)
+    return image
+
+
 def load_miccai22(path: str, i: int) -> Tuple[np.ndarray, np.ndarray, Tuple[float, float, float]]:
     """i goes from 1 to 100"""
     image = nib.load(f"{path}/data/{i:03d}.nii.gz")
@@ -51,10 +59,7 @@ def load_miccai22(path: str, i: int) -> Tuple[np.ndarray, np.ndarray, Tuple[floa
     image = image.get_fdata()
     label = label.get_fdata()
 
-    bone = 0.005 * np.clip(image, a_min=0.0, a_max=1000.0).astype(np.float32)
-    range1 = 0.03 * np.clip(image, a_min=0.0, a_max=80.0).astype(np.float32)
-    range2 = 0.013 * np.clip(image, a_min=-50.0, a_max=220.0).astype(np.float32)
-    image = np.stack([bone, range1, range2], axis=-1)
+    image = preprocess_miccai22_image(image)
 
     label = 2.0 * label - 1.0
     label = label.astype(np.float32)

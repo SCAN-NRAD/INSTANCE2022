@@ -1,4 +1,5 @@
 import argparse
+import glob
 import pickle
 import sys
 from functools import partial
@@ -6,14 +7,7 @@ from functools import partial
 import haiku as hk
 import nibabel as nib
 import numpy as np
-
-try:
-    from monai.metrics.hausdorff_distance import compute_hausdorff_distance
-except ImportError:
-    print("Could not import monai.metrics.hausdorff_distance. Will return NaN for HD.")
-
-    def compute_hausdorff_distance(y_pred, y_gt):
-        return np.nan
+import os
 
 
 import jax
@@ -21,20 +15,22 @@ import jax
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a model")
-    parser.add_argument("--path", type=str, required=True, help="Path to wandb run")
-    parser.add_argument("--weights", type=str, default="w.pkl", help="Relative path to weights")
+    parser.add_argument("--path_args", type=str, required=True, help="Path to args.pkl")
+    parser.add_argument("--path_weights", type=str, required=True, help="Path to weights.pkl")
+    parser.add_argument("--path_scripts", type=str, required=True, help="Path to python scripts")
+    parser.add_argument("--path_images", type=str, required=True, help="Path to images")
+    parser.add_argument("--path_labels", type=str, required=False, help="Path to labels")
+    parser.add_argument("--path_output", type=str, required=True, help="Path to output")
+
     parser.add_argument("--threshold", type=float, default=0.0, help="Threshold for segmentation")
-    parser.add_argument("--data", type=str, default=".", help="Path to data")
-    parser.add_argument("--indices", nargs="+", type=int, required=True, help="Indices of the runs to evaluate")
     args = parser.parse_args()
 
-    print(args.path, flush=True)
-    sys.path.insert(0, args.path)
+    sys.path.insert(0, args.path_scripts)
     import model  # noqa: F401
-    from functions import load_miccai22, round_zooms, eval_model  # noqa: F401
+    from functions import eval_model, preprocess_miccai22_image, round_zooms  # noqa: F401
 
     # Load model args
-    with open(f"{args.path}/args.pkl", "rb") as f:
+    with open(args.path_args, "rb") as f:
         train_args = pickle.load(f)
     print(train_args, flush=True)
 
@@ -42,55 +38,56 @@ def main():
     def apply(w, x, zooms):
         return hk.without_apply_rng(hk.transform(model.unet_with_groups(train_args))).apply(w, x, zooms)
 
-    with open(f"{args.path}/{args.weights}", "rb") as f:
+    with open(args.path_weights, "rb") as f:
         w = pickle.load(f)
         w = jax.device_put(w)
 
-    collect_metrics = []
+    images = sorted(glob.glob(f"{args.path_images}/*.nii.gz"))
 
-    for idx in args.indices:
-        print(f"Evaluating run {idx}", flush=True)
-        img, lab, zooms = load_miccai22(args.data, idx)
-        pred = eval_model(img, lambda x: apply(w, x, round_zooms(zooms)), overlap=2.0, verbose=True)
+    print(images, flush=True)
+    if args.path_labels is not None:
+        labels = sorted(glob.glob(f"{args.path_labels}/*.nii.gz"))
+    else:
+        labels = [None] * len(images)
+
+    if len(images) != len(labels):
+        raise ValueError("Number of images and labels do not match")
+
+    DSCs = []
+
+    for image_path, label_path in zip(images, labels):
+        print(f"Evaluating run {image_path}", flush=True)
+
+        image = nib.load(image_path)
+        img = preprocess_miccai22_image(image.get_fdata())
+        pred = eval_model(img, lambda x: apply(w, x, round_zooms(image.header.get_zooms())), overlap=2.0, verbose=True)
         print(flush=True)
 
-        original = nib.load(f"{args.data}/label/{idx:03d}.nii.gz")
-        y_gt = original.get_fdata()
+        nib.save(nib.Nifti1Image(pred, image.affine, image.header), f"{args.path_output}/eval{os.path.basename(image_path)}")
 
-        img = nib.Nifti1Image(pred, original.affine, original.header)
-        nib.save(img, f"{args.path}/eval{idx:03d}.nii.gz")
+        if label_path is not None:
+            if os.path.basename(image_path) != os.path.basename(label_path):
+                print(f"Image and label names do not match: {image_path} {label_path}", flush=True)
 
-        y_pred = (np.sign(pred - args.threshold) + 1) / 2
-        four_classes = 2 * y_gt + y_pred
-        img = nib.Nifti1Image(four_classes, original.affine, original.header)
-        nib.save(img, f"{args.path}/confusion{idx:03d}.nii.gz")
+            label = nib.load(label_path)
+            y_gt = label.get_fdata()
+            y_pred = (np.sign(pred - args.threshold) + 1) / 2
+            four_classes = 2 * y_gt + y_pred
+            nib.save(
+                nib.Nifti1Image(four_classes, label.affine, label.header),
+                f"{args.path_output}/confusion{os.path.basename(image_path)}.nii.gz",
+            )
 
-        tp = np.sum(y_pred * y_gt)
-        # tn = np.sum((1 - y_pred) * (1 - y_gt))
-        fp = np.sum(y_pred * (1 - y_gt))
-        fn = np.sum((1 - y_pred) * y_gt)
+            tp = np.sum(y_pred * y_gt)
+            # tn = np.sum((1 - y_pred) * (1 - y_gt))
+            fp = np.sum(y_pred * (1 - y_gt))
+            fn = np.sum((1 - y_pred) * y_gt)
 
-        DSC = 2 * tp / (2 * tp + fp + fn)
-        print(f"DSC (dice score): {DSC}", flush=True)
+            DSC = 2 * tp / (2 * tp + fp + fn)
+            print(f"DSC (dice score): {DSC}", flush=True)
+            DSCs.append(DSC)
 
-        HD = float(compute_hausdorff_distance(y_pred[None, None], y_gt[None, None]))
-        print(f"HD (hausdorff distance): {HD}", flush=True)
-
-        RVD = (tp + fp) / (tp + fn) - 1
-        print(f"RVD (relative volume difference): {RVD}", flush=True)
-
-        collect_metrics.append([DSC, HD, RVD])
-
-    collect_metrics = np.array(collect_metrics)
-
-    print(f"DSC (dice score):                 {', '.join(map(repr, collect_metrics[:,0]))}")
-    print(f"HD (hausdorff distance):          {', '.join(map(repr, collect_metrics[:,1]))}")
-    print(f"RVD (relative volume difference): {', '.join(map(repr, collect_metrics[:,2]))}")
-
-    avg_metrics = np.mean(collect_metrics, axis=0)
-    print(f"Average DSC: {avg_metrics[0]}", flush=True)
-    print(f"Average HD: {avg_metrics[1]}", flush=True)
-    print(f"Average RVD: {avg_metrics[2]}", flush=True)
+    print(f"DSC (dice score):                 {', '.join(map(repr, DSCs))}")
 
 
 if __name__ == "__main__":
