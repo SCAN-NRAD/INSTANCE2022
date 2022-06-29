@@ -9,3 +9,4 @@ foo.py
 *.png
 *.gif
 .Dockerfile.swp
+*.tar
