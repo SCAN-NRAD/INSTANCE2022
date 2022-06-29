@@ -41,10 +41,10 @@ def main():
     parser.add_argument("--seed_train", type=int, default=1, help="Random seed")
     parser.add_argument("--name", type=str, required=True, help="Name of the run")
     parser.add_argument("--trainset_start", type=int, default=1, help="Start index of training set")
-    parser.add_argument("--trainset_stop", type=int, default=90, help="Stop index of training set")
+    parser.add_argument("--trainset_stop", type=int, default=70, help="Stop index of training set")
     parser.add_argument("--pretrained", type=str, default=None, help="Path to npy file")
     parser.add_argument("--equivariance", type=str, default="E3", help="Equivariance group")
-    parser.add_argument("--width", type=int, default=7, help="Width of the network")
+    parser.add_argument("--width", type=int, default=6, help="Width of the network")
     for l in range(4 + 1):
         parser.add_argument(
             f"--num_radial_basis_sh{l}",
@@ -63,10 +63,10 @@ def main():
     parser.add_argument("--conv_diameter", type=float, default=5.0, help="Diameter of the convolution kernel")
     parser.add_argument("--instance_norm_eps", type=float, default=0.6, help="Instance normalization epsilon")
     parser.add_argument("--optimizer", type=str, default="adam", help="Optimizer, either adam or sgd")
-    parser.add_argument("--lr_div_step", type=int, default=20_000, help="Learning rate decay step")
+    parser.add_argument("--lr_div_step", type=int, default=99_999_999, help="Learning rate decay step")
     parser.add_argument("--augmentation_noise", type=float, default=0.0, help="Probability to add noise augmentation")
     parser.add_argument(
-        "--augmentation_deformation", type=float, default=0.0, help="Probability to add deformation augmentation"
+        "--augmentation_deformation", type=float, default=0.8, help="Probability to add deformation augmentation"
     )
     parser.add_argument(
         "--deformation_temperature", type=float, default=2e-4, help="Temperature of the deformation augmentation"

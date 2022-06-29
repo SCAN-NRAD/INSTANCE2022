@@ -193,7 +193,7 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
         train_idx = list(range(args.trainset_start, args.trainset_stop + 1))
         test_idx = [i for i in list(range(1, 100 + 1)) if i not in train_idx]
 
-    train_set = [load_miccai22(args.data, i) for i in train_idx]
+    train_set = [(i,) + load_miccai22(args.data, i) for i in train_idx]
 
     test_set = []
     test_sample_size = np.array([200, 200, 25])
@@ -205,7 +205,7 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
         start = end - test_sample_size
         img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
-        test_set.append((img, lab, zooms))
+        test_set.append((i, img, lab, zooms))
 
     return TrainState(
         time0=getattr(old_state, "time0", time.perf_counter()),
@@ -239,7 +239,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
     if step == 120:
         jax.profiler.start_trace(wandb.run.dir)
 
-    img, lab, zooms = state.train_set[step % len(state.train_set)]
+    i, img, lab, zooms = state.train_set[step % len(state.train_set)]
     img, lab = jax.device_put((img, lab))
 
     # data augmentation
@@ -312,7 +312,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
 
     if step % 100 == 0:
         c = np.zeros((len(state.test_set), 2, 2))
-        for j, (img, lab, zooms) in enumerate(state.test_set):
+        for j, (i, img, lab, zooms) in enumerate(state.test_set):
             zooms = round_zooms(zooms)
             test_pred = eval_model(img, lambda x: apply_model(w, x, zooms))
             c[j] = np.array(confusion_matrix(lab, test_pred))
@@ -320,7 +320,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
         with np.errstate(invalid="ignore"):
             dice = 2 * c[:, 1, 1] / (2 * c[:, 1, 1] + c[:, 1, 0] + c[:, 0, 1])
 
-        wandb.log({f"dice_{91 + i}": d for i, d in enumerate(dice)}, commit=False, step=step)
+        wandb.log({f"dice_{i}": d for (i, _, _, _), d in zip(state.test_set, dice)}, commit=False, step=step)
 
         sorted_dices = np.sort(dice)
         for i, (old_dice, new_dice) in enumerate(zip(state.best_sorted_dices, sorted_dices)):
