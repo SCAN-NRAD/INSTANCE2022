@@ -18,6 +18,7 @@ import jax.numpy as jnp
 import wandb
 from jax.config import config
 from model import unet_with_groups
+import e3nn_jax as e3nn
 
 _CONFIG = config_flags.DEFINE_config_file("config")
 
@@ -55,6 +56,9 @@ def main(_):
 
     with open(f"{wandb.run.dir}/config.pkl", "wb") as f:
         pickle.dump(config, f)
+
+    e3nn.config("path_normalization", config.path_normalization)
+    e3nn.config("gradient_normalization", config.gradient_normalization)
 
     # Load data
     print("Loading data...", flush=True)
