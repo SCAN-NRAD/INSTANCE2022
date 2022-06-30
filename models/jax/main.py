@@ -66,10 +66,10 @@ def main():
     parser.add_argument("--lr_div_step", type=int, default=99_999_999, help="Learning rate decay step")
     parser.add_argument("--augmentation_noise", type=float, default=0.0, help="Probability to add noise augmentation")
     parser.add_argument(
-        "--augmentation_deformation", type=float, default=0.8, help="Probability to add deformation augmentation"
+        "--augmentation_deformation", type=float, default=1.0, help="Probability to add deformation augmentation"
     )
     parser.add_argument(
-        "--deformation_temperature", type=float, default=2e-4, help="Temperature of the deformation augmentation"
+        "--deformation_temperature", type=float, default=5e-4, help="Temperature of the deformation augmentation"
     )
     parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
     args = parser.parse_args()

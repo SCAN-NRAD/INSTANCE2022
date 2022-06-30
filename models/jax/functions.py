@@ -35,6 +35,7 @@ def deform_mri(rng, img, temperature):
         The deformed image.
     """
     assert img.shape[0] == img.shape[1]
+    temperature = jax.random.uniform(rng, (), minval=0.0, maxval=temperature)
     f = lambda i: deform(i, temperature, 5, rng, "nearest")
     for _ in range(img.ndim - 2):
         f = jax.vmap(f, -1, -1)
