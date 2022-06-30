@@ -110,8 +110,8 @@ def bn(x: e3nn.IrrepsData, eps: float) -> e3nn.IrrepsData:
         return jax.vmap(f, 4, 4)(x)
 
 
-def unet_with_groups(args):
-    assert args.equivariance in ["E3", "SE3"]
+def unet_with_groups(config):
+    assert config.equivariance in ["E3", "SE3"]
 
     def f(input: jnp.ndarray, zooms: Tuple[float, float, float]) -> jnp.ndarray:
         r"""Unet with irreps regrouped into chunks of varying size through the network.
@@ -123,35 +123,22 @@ def unet_with_groups(args):
         Returns:
             jnp.ndarray: output data of shape ``(x, y, z)``
         """
-        num_radial_basis = {
-            0: args.num_radial_basis_sh0,
-            1: args.num_radial_basis_sh1,
-            2: args.num_radial_basis_sh2,
-            3: args.num_radial_basis_sh3,
-            4: args.num_radial_basis_sh4,
-        }
-        irreps_sh = e3nn.Irreps.spherical_harmonics(4, p=-1 if args.equivariance == "E3" else 1)
-        irreps_sh = e3nn.Irreps([mul_ir for mul_ir in irreps_sh if num_radial_basis[mul_ir.ir.l] > 0])
+        irreps_sh = e3nn.Irreps.spherical_harmonics(4, p=-1 if config.equivariance == "E3" else 1)
+        irreps_sh = e3nn.Irreps([mul_ir for mul_ir in irreps_sh if config.num_radial_basis_sh[mul_ir.ir.l] > 0])
         kw = dict(
             irreps_sh=irreps_sh,
-            num_radial_basis=num_radial_basis,
-            relative_starts={
-                0: args.relative_start_sh0,
-                1: args.relative_start_sh1,
-                2: args.relative_start_sh2,
-                3: args.relative_start_sh3,
-                4: args.relative_start_sh4,
-            },
+            num_radial_basis={l: n for l, n in enumerate(config.num_radial_basis_sh)},
+            relative_starts={l: s for l, s in enumerate(config.relative_start_sh)},
         )
 
         def cbg(vox: Voxels, mul: float, *, radius: float, filter=None) -> Voxels:
             mul = round(mul)
             assert len(vox.data.shape) == 1 + 3 + 1  # (batch, x, y, z, channel)
 
-            if args.equivariance == "E3":
+            if config.equivariance == "E3":
                 irreps_a = e3nn.Irreps("4x0e + 4x0o")
                 irreps_b = e3nn.Irreps("2x1e + 2x1o + 2e + 2o")
-            if args.equivariance == "SE3":
+            if config.equivariance == "SE3":
                 irreps_a = e3nn.Irreps("4x0e")
                 irreps_b = e3nn.Irreps("2x1e + 2e")
 
@@ -164,17 +151,17 @@ def unet_with_groups(args):
 
             # Linear
             x = n_vmap(1 + 3, MixChannels(mul, irreps))(x)
-            x = bn(x, args.instance_norm_eps)
+            x = bn(x, config.instance_norm_eps)
             x = g(x)
 
             # Convolution
             x = jax.vmap(Convolution(irreps, diameter=2.0 * radius, steps=vox.zooms, **kw), 4, 4)(x)
-            x = bn(x, args.instance_norm_eps)
+            x = bn(x, config.instance_norm_eps)
             x = g(x)
 
             # Linear
             x = n_vmap(1 + 3, MixChannels(mul, irreps))(x)
-            x = bn(x, args.instance_norm_eps)
+            x = bn(x, config.instance_norm_eps)
             x = g(x)
 
             return Voxels(zooms=vox.zooms, data=x)
@@ -202,21 +189,21 @@ def unet_with_groups(args):
             x = jax.vmap(Convolution(irreps, diameter=2.0 * radius, steps=vox.zooms, **kw), 4, 4)(x)
             return Voxels(zooms=vox.zooms, data=x)
 
-        mul = args.width  # default is 5
+        mul = config.width  # default is 5
 
         assert input.ndim == 3 + 1
         x = Voxels(
             zooms=zooms, data=e3nn.IrrepsData.from_contiguous("0e", input[None, :, :, :, :, None])
         )  # Voxel of shape (batch, x, y, z, channel, irreps)
 
-        min_zoom = args.min_zoom
-        cvrad = args.conv_diameter / 2.0
+        min_zoom = config.min_zoom
+        cvrad = config.conv_diameter / 2.0
 
         # Block A
         print_stats("Block A", x)
         x = group_conv(
             x,
-            irreps="0e + 1o" if args.equivariance == "E3" else "0e + 1e",
+            irreps="0e + 1o" if config.equivariance == "E3" else "0e + 1e",
             mul=round(mul),
             radius=cvrad * min_zoom,
         )
@@ -226,17 +213,17 @@ def unet_with_groups(args):
             filter=["0e", "0o", "1e", "1o"],
             radius=cvrad * min_zoom,
         )
-        min_zoom *= args.downsampling
+        min_zoom *= config.downsampling
         x_a = x
         x = down(x, min_zoom=min_zoom)
 
-        if args.dummy:
+        if config.dummy:
             x = cbg(x, mul, filter=["0e", "0o", "1e", "1o"], radius=cvrad * min_zoom)
             x = upcat(x, x_a)
-            min_zoom /= args.downsampling
+            min_zoom /= config.downsampling
             x = group_conv(x, irreps="0e", mul=round(mul), radius=cvrad * min_zoom)
             x = x.data.repeat_irreps_by_last_axis()  # [batch, x, y, z, irreps]
-            x = bn(x, args.instance_norm_eps)
+            x = bn(x, config.instance_norm_eps)
             x = g(x)
             x = n_vmap(1 + 3, e3nn.Linear("0e"))(x)
             return x.contiguous[0, :, :, :, 0]
@@ -245,7 +232,7 @@ def unet_with_groups(args):
         print_stats("Block B", x)
         x = cbg(x, 3 * mul, radius=cvrad * min_zoom)
         x = cbg(x, 3 * mul, radius=cvrad * min_zoom)
-        min_zoom *= args.downsampling
+        min_zoom *= config.downsampling
         x_b = x
         x = down(x, min_zoom=min_zoom)
 
@@ -253,7 +240,7 @@ def unet_with_groups(args):
         print_stats("Block C", x)
         x = cbg(x, 6 * mul, radius=cvrad * min_zoom)
         x = cbg(x, 6 * mul, radius=cvrad * min_zoom)
-        min_zoom *= args.downsampling
+        min_zoom *= config.downsampling
         x_c = x
         x = down(x, min_zoom=min_zoom)
 
@@ -266,23 +253,23 @@ def unet_with_groups(args):
         # Block E
         print_stats("Block E", x)
         x = upcat(x, x_c)
-        min_zoom /= args.downsampling
+        min_zoom /= config.downsampling
         x = cbg(x, 6 * mul, radius=cvrad * min_zoom)
         x = cbg(x, 6 * mul, radius=cvrad * min_zoom)
 
         # Block F
         print_stats("Block F", x)
         x = upcat(x, x_b)
-        min_zoom /= args.downsampling
+        min_zoom /= config.downsampling
         x = cbg(x, 3 * mul, radius=cvrad * min_zoom)
         x = cbg(x, mul, filter=["0e", "0o", "1e", "1o"], radius=cvrad * min_zoom)
 
         # Block G
         print_stats("Block G", x)
         x = upcat(x, x_a)
-        min_zoom /= args.downsampling
+        min_zoom /= config.downsampling
         x = cbg(
-            x, mul, filter=["0e", "1o", "2e"] if args.equivariance == "E3" else ["0e", "1e", "2e"], radius=cvrad * min_zoom
+            x, mul, filter=["0e", "1o", "2e"] if config.equivariance == "E3" else ["0e", "1e", "2e"], radius=cvrad * min_zoom
         )
 
         x = group_conv(x, irreps="0e", mul=round(2 * mul), radius=cvrad * min_zoom)
@@ -291,7 +278,7 @@ def unet_with_groups(args):
 
         print_stats("MLP", x)
         for h in [round(16 * mul), round(16 * mul), 1]:
-            x = bn(x, args.instance_norm_eps)
+            x = bn(x, config.instance_norm_eps)
             x = g(x)
             x = n_vmap(1 + 3, e3nn.Linear(f"{h}x0e"))(x)
 

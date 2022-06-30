@@ -1,4 +1,5 @@
-import argparse
+import copy
+import hashlib
 import importlib
 import pickle
 import shutil
@@ -9,13 +10,22 @@ from functools import partial
 import haiku as hk
 import numpy as np
 import optax
-import hashlib
+from absl import app, flags
+from ml_collections import config_flags
 
 import jax
 import jax.numpy as jnp
 import wandb
 from jax.config import config
 from model import unet_with_groups
+
+_CONFIG = config_flags.DEFINE_config_file("config")
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string("pretrained", None, "Path to weights")
+flags.DEFINE_string("name", None, "Name of the run", required=True)
+flags.DEFINE_string("data", "../../train_2", "Path to train data")
+flags.DEFINE_string("logdir", ".", "Path to log directory")
 
 config.update("jax_debug_nans", True)
 config.update("jax_debug_infs", True)
@@ -30,53 +40,11 @@ def hash_file(file_path: str) -> str:
     return sha256.hexdigest()
 
 
-def main():
-    print("Welcome", flush=True)
-    # Parse arguments
-    parser = argparse.ArgumentParser(description="Train a model")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
-    parser.add_argument("--data", type=str, default="../../train_2", help="Path to data")
-    parser.add_argument("--logdir", type=str, default=".", help="Path to log directory")
-    parser.add_argument("--seed_init", type=int, default=1, help="Random seed")
-    parser.add_argument("--seed_train", type=int, default=1, help="Random seed")
-    parser.add_argument("--name", type=str, required=True, help="Name of the run")
-    parser.add_argument("--trainset_start", type=int, default=1, help="Start index of training set")
-    parser.add_argument("--trainset_stop", type=int, default=70, help="Stop index of training set")
-    parser.add_argument("--pretrained", type=str, default=None, help="Path to npy file")
-    parser.add_argument("--equivariance", type=str, default="E3", help="Equivariance group")
-    parser.add_argument("--width", type=int, default=6, help="Width of the network")
-    for l in range(4 + 1):
-        parser.add_argument(
-            f"--num_radial_basis_sh{l}",
-            type=int,
-            default=2 if l <= 2 else 0,
-            help=f"Number of radial basis functions for spherical harmonics {l}",
-        )
-        parser.add_argument(
-            f"--relative_start_sh{l}",
-            type=float,
-            default=0.0,
-            help=f"Relative start of radial basis for spherical harmonics {l}",
-        )
-    parser.add_argument("--min_zoom", type=float, default=0.36, help="Minimum zoom")
-    parser.add_argument("--downsampling", type=float, default=2.0, help="Downsampling factor")
-    parser.add_argument("--conv_diameter", type=float, default=5.0, help="Diameter of the convolution kernel")
-    parser.add_argument("--instance_norm_eps", type=float, default=0.6, help="Instance normalization epsilon")
-    parser.add_argument("--optimizer", type=str, default="adam", help="Optimizer, either adam or sgd")
-    parser.add_argument("--lr_div_step", type=int, default=99_999_999, help="Learning rate decay step")
-    parser.add_argument("--augmentation_noise", type=float, default=0.0, help="Probability to add noise augmentation")
-    parser.add_argument(
-        "--augmentation_deformation", type=float, default=1.0, help="Probability to add deformation augmentation"
-    )
-    parser.add_argument(
-        "--deformation_temperature", type=float, default=5e-4, help="Temperature of the deformation augmentation"
-    )
-    parser.add_argument("--dummy", type=int, default=0, help="Dummy model to test code")
-    args = parser.parse_args()
+def main(_):
+    config = _CONFIG.value
+    print(config, flush=True)
 
-    print(args, flush=True)
-
-    wandb.init(project="miccai22", entity="instance2022", name=args.name, dir=args.logdir, config=args)
+    wandb.init(project="miccai22", entity="instance2022", name=FLAGS.name, dir=FLAGS.logdir, config=copy.deepcopy(config))
     shutil.copy(__file__, f"{wandb.run.dir}/main.py")
     shutil.copy("./model.py", f"{wandb.run.dir}/model.py")
     shutil.copy("./functions.py", f"{wandb.run.dir}/functions.py")
@@ -85,29 +53,29 @@ def main():
     sys.path.insert(0, wandb.run.dir)
     import functions
 
-    with open(f"{wandb.run.dir}/args.pkl", "wb") as f:
-        pickle.dump(args, f)
+    with open(f"{wandb.run.dir}/config.pkl", "wb") as f:
+        pickle.dump(config, f)
 
     # Load data
     print("Loading data...", flush=True)
-    img, lab, zooms = functions.load_miccai22(args.data, 1)
+    img, lab, zooms = functions.load_miccai22(FLAGS.data, 1)
 
     # Create model
-    model = hk.without_apply_rng(hk.transform(unet_with_groups(args)))
+    model = hk.without_apply_rng(hk.transform(unet_with_groups(config.model)))
 
-    if args.pretrained is not None:
+    if FLAGS.pretrained is not None:
         print("Loading pretrained parameters...", flush=True)
-        w = pickle.load(open(args.pretrained, "rb"))
+        w = pickle.load(open(FLAGS.pretrained, "rb"))
     else:
         print("Initializing model...", flush=True)
         t = time.perf_counter()
-        w = model.init(jax.random.PRNGKey(args.seed_init), img[:100, :100, :25], zooms)
+        w = model.init(jax.random.PRNGKey(config.seed_init), img[:100, :100, :25], zooms)
         print(f"Initialized model in {functions.format_time(time.perf_counter() - t)}", flush=True)
 
     def opt(lr):
-        if args.optimizer == "adam":
+        if config.optimizer.algorithm == "adam":
             return optax.adam(lr)
-        if args.optimizer == "sgd":
+        if config.optimizer.algorithm == "sgd":
             return optax.sgd(lr, 0.9)
 
     @partial(jax.jit, static_argnums=(2,))
@@ -149,10 +117,10 @@ def main():
         w = optax.apply_updates(w, updates)
         return w, opt_state, loss, pred
 
-    opt_state = opt(args.lr).init(w)
+    opt_state = opt(config.optimizer.lr).init(w)
 
     hash = hash_file(f"{wandb.run.dir}/functions.py")
-    state = functions.init_train_loop(args, None, 0, w, opt_state)
+    state = functions.init_train_loop(config, FLAGS.data, None, 0, w, opt_state)
     print("Start main loop...", flush=True)
 
     for step in range(99_999_999):
@@ -162,11 +130,11 @@ def main():
         if new_hash != hash:
             hash = new_hash
             importlib.reload(functions)
-            state = functions.init_train_loop(args, state, step, w, opt_state)
+            state = functions.init_train_loop(config, FLAGS.data, state, step, w, opt_state)
             print("Continue main loop...", flush=True)
 
-        state, w, opt_state = functions.train_loop(args, state, step, w, opt_state, update, apply_model)
+        state, w, opt_state = functions.train_loop(config, state, step, w, opt_state, update, apply_model)
 
 
 if __name__ == "__main__":
-    main()
+    app.run(main)

@@ -184,22 +184,15 @@ TrainState = namedtuple(
 )
 
 
-def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
+def init_train_loop(config, data_path, old_state, step, w, opt_state) -> TrainState:
     print("Prepare for the training loop...", flush=True)
 
-    if args.dummy:
-        train_idx = [1, 2]
-        test_idx = [91, 92]
-    else:
-        train_idx = list(range(args.trainset_start, args.trainset_stop + 1))
-        test_idx = [i for i in list(range(1, 100 + 1)) if i not in train_idx]
-
-    train_set = [(i,) + load_miccai22(args.data, i) for i in train_idx]
+    train_set = [(i,) + load_miccai22(data_path, i) for i in config.trainset]
 
     test_set = []
     test_sample_size = np.array([200, 200, 25])
-    for i in test_idx:
-        img, lab, zooms = load_miccai22(args.data, i)  # test data
+    for i in config.testset:
+        img, lab, zooms = load_miccai22(data_path, i)  # test data
         center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
         start = np.maximum(center_of_mass - test_sample_size // 2, 0)
         end = np.minimum(start + test_sample_size, np.array(img.shape[:3]))
@@ -215,7 +208,7 @@ def init_train_loop(args, old_state, step, w, opt_state) -> TrainState:
         t4=time.perf_counter(),
         losses=getattr(old_state, "losses", np.ones((len(train_set),))),
         best_sorted_dices=getattr(old_state, "best_sorted_dices", np.zeros((len(test_set),))),
-        rng=getattr(old_state, "rng", jax.random.PRNGKey(args.seed_train)),
+        rng=getattr(old_state, "rng", jax.random.PRNGKey(config.seed_train)),
     )
 
 
@@ -233,7 +226,7 @@ def random_split(rng: jnp.ndarray, n: int) -> jnp.ndarray:
     return jax.random.split(rng, n)
 
 
-def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model) -> TrainState:
+def train_loop(config, state: TrainState, step, w, opt_state, update, apply_model) -> TrainState:
     t0 = time.perf_counter()
     t_extra = t0 - state.t4
 
@@ -246,12 +239,12 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
     # data augmentation
     rng = random_split(state.rng, 8)
 
-    if jax.random.uniform(rng[0]) < args.augmentation_noise:
+    if jax.random.uniform(rng[0]) < config.augmentation.noise:
         img = noise_mri(rng[1], img)
 
-    if jax.random.uniform(rng[2]) < args.augmentation_deformation:
-        img = deform_mri(rng[3], img, args.deformation_temperature)
-        lab = deform_mri(rng[3], lab, args.deformation_temperature)
+    if jax.random.uniform(rng[2]) < config.augmentation.deformation:
+        img = deform_mri(rng[3], img, config.augmentation.deformation_temperature)
+        lab = deform_mri(rng[3], lab, config.augmentation.deformation_temperature)
         lab = jnp.round(lab)
 
     # regroup zooms and sizes by rounding and taking subsets of the volume
@@ -280,7 +273,7 @@ def train_loop(args, state: TrainState, step, w, opt_state, update, apply_model)
 
     t1 = time.perf_counter()
 
-    lr = args.lr * max(0.1 ** math.floor(step / args.lr_div_step), 0.1)
+    lr = config.optimizer.lr * max(0.1 ** math.floor(step / config.optimizer.lr_div_step), 0.1)
     w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr, train_padding)
     train_loss.block_until_ready()
 
