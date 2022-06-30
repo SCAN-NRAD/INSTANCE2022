@@ -62,8 +62,6 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
     min_ce_loss = 10000
     epochs_without_min = 0
 
-    #train_one_model(model,dataset,device,log_name,writer,checkpoint_path,epoch_start,epoch_end,optimizer,val_percent= 0.22,dataset_fraction=1,min_ce_loss=min_ce_loss,patience=25,epochs_without_min = epochs_without_min)
-
     logging.basicConfig(filename=log_name, filemode='a', level=logging.INFO)
 
     #n_val = int(len(dataset) * val_percent)
@@ -83,7 +81,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
         first_model = True
         prev_model_params = None
-        optimizers = dict()
+        prev_optimizer_state = None
         for batch_no, batch in enumerate(train_loader):
 
             imgs = batch['image']
@@ -99,20 +97,17 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
             input_irreps = "3x0e"
             model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
+            optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
 
             #load previous model's parameters
             if not first_model:
                 for p1, p2 in zip(prev_model_params, model.parameters()):
                     with torch.no_grad():
                         p2[:] = p1
+                optimizer.load_state_dict(prev_optimizer_state)
+ 
             else:
                 first_model = False
-
-            if resolution not in optimizers.keys():
-                optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
-                optimizers[resolution]  = optimizer
-            else:
-                optimizer = optimizers[resolution]
 
             model.train()
 
@@ -131,6 +126,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
             nn.utils.clip_grad_norm_(model.parameters(),.1)
             optimizer.step()
 
+            prev_optimizer_state = optimizer.state_dict() 
             prev_model_params = model.parameters()
 
 
@@ -302,4 +298,4 @@ def multiresolution_experiments(checkpoint_dir,downsample,gpu):
     train_val_multiresolution(checkpoint_dir,1000, n=3)
     predict_multiresolution(checkpoint_dir,n=3)
 
-multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_2/',3,'cuda')
+multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_3/',3,'cuda')
