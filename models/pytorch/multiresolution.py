@@ -75,13 +75,12 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
     criterion = nn.CrossEntropyLoss()
 
     min_loss = False
+    first_model = True
+    prev_model_params = None
+    prev_optimizer_state = None
 
     for epoch in range(epoch_start,epoch_end):
 
-
-        first_model = True
-        prev_model_params = None
-        prev_optimizer_state = None
         for batch_no, batch in enumerate(train_loader):
 
             imgs = batch['image']

@@ -7,6 +7,8 @@ def get_config():
     config.seed_train = 1
     config.trainset = list(range(1, 70 + 1))
     config.testset = list(range(71, 100 + 1))
+    config.path_normalization = "element"
+    config.gradient_normalization = "path"
 
     config.model = config_dict.ConfigDict()
     config.model.dummy = False

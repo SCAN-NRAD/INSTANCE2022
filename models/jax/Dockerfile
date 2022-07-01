@@ -1,5 +1,7 @@
 FROM mariogeiger/e3nn-jax:0.6.3-jax0.3.14-cuda11.6.2
 
+RUN pip3 install ml_collections absl-py
+
 COPY functions.py /home/functions.py
 COPY model.py /home/model.py
 COPY evaluate.py /home/evaluate.py
