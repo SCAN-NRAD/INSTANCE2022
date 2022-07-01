@@ -1,4 +1,3 @@
-import copy
 import hashlib
 import importlib
 import pickle
@@ -40,11 +39,41 @@ def hash_file(file_path: str) -> str:
     return sha256.hexdigest()
 
 
+def flatten_dictionary(dictionary):
+    """Flatten a dictionary
+
+    Args:
+        dictionary (dict): Dictionary to flatten, it must have `items` method
+
+    Returns:
+        dict: Flattened dictionary with keys as strings separated by dots
+
+    Example:
+    >>> flatten_dictionary({'a': {'b': 1, 'c': 2}, 'd': 3})
+    {'a.b': 1, 'a.c': 2, 'd': 3}
+    """
+    output = {}
+    for key, value in dictionary.items():
+        if not hasattr(value, "items"):
+            output[key] = value
+        else:
+            sub_output = flatten_dictionary(value)
+            for sub_key, sub_value in sub_output.items():
+                output[f"{key}.{sub_key}"] = sub_value
+    return output
+
+
 def main(_):
     config = _CONFIG.value
     print(config, flush=True)
 
-    wandb.init(project="miccai22", entity="instance2022", name=FLAGS.name, dir=FLAGS.logdir, config=copy.deepcopy(config))
+    wandb.init(
+        project="miccai22",
+        entity="instance2022",
+        name=FLAGS.name,
+        dir=FLAGS.logdir,
+        config=flatten_dictionary(config),
+    )
     shutil.copy(__file__, f"{wandb.run.dir}/main.py")
     shutil.copy("./model.py", f"{wandb.run.dir}/model.py")
     shutil.copy("./functions.py", f"{wandb.run.dir}/functions.py")
