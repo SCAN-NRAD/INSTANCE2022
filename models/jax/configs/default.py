@@ -37,6 +37,8 @@ def get_config():
     config.optimizer.lr = 1e-3
     config.optimizer.algorithm = "adam"
     config.optimizer.lr_div_step = 99_999_999
+    config.optimizer.lr_div_factor = 0.1
+    config.optimizer.lr_div_factor_min = 1.0
 
     config.augmentation = config_dict.ConfigDict()
     config.augmentation.noise = 0.0
