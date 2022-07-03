@@ -11,6 +11,7 @@ def get_config():
     config.gradient_normalization = "path"
 
     config.model = config_dict.ConfigDict()
+    config.model.name = "v1"
     config.model.dummy = False
     config.model.equivariance = "E3"
     config.model.width = 6

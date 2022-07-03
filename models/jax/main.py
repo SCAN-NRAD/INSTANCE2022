@@ -16,7 +16,6 @@ import jax
 import jax.numpy as jnp
 import wandb
 from jax.config import config
-from model import unet_with_groups
 import e3nn_jax as e3nn
 
 _CONFIG = config_flags.DEFINE_config_file("config")
@@ -76,12 +75,13 @@ def main(_):
         config=flatten_dictionary(config),
     )
     shutil.copy(__file__, f"{wandb.run.dir}/main.py")
-    shutil.copy("./model.py", f"{wandb.run.dir}/model.py")
+    shutil.copy(f"./models/{config.model.name}.py", f"{wandb.run.dir}/model.py")
     shutil.copy("./functions.py", f"{wandb.run.dir}/functions.py")
     shutil.copy("./evaluate.py", f"{wandb.run.dir}/evaluate.py")
     shutil.copy("./diffeomorphism.py", f"{wandb.run.dir}/diffeomorphism.py")
     sys.path.insert(0, wandb.run.dir)
     import functions
+    import model
 
     with open(f"{wandb.run.dir}/config.pkl", "wb") as f:
         pickle.dump(config, f)
@@ -94,7 +94,7 @@ def main(_):
     img, lab, zooms = functions.load_miccai22(FLAGS.data, 1)
 
     # Create model
-    model = hk.without_apply_rng(hk.transform(unet_with_groups(config.model)))
+    model = hk.without_apply_rng(hk.transform(model.create_model(config.model)))
 
     if FLAGS.pretrained is not None:
         print("Loading pretrained parameters...", flush=True)
