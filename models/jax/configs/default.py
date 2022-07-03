@@ -8,7 +8,7 @@ def get_config():
     config.trainset = list(range(1, 70 + 1))
     config.testset = list(range(71, 100 + 1))
     config.path_normalization = "element"
-    config.gradient_normalization = "path"
+    config.gradient_normalization = "element"
 
     config.model = config_dict.ConfigDict()
     config.model.name = "v1"
