@@ -273,7 +273,9 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
 
     t1 = time.perf_counter()
 
-    lr = config.optimizer.lr * max(0.1 ** math.floor(step / config.optimizer.lr_div_step), 0.1)
+    lr = config.optimizer.lr * max(
+        config.optimizer.lr_div_factor ** math.floor(step / config.optimizer.lr_div_step), config.optimizer.lr_div_factor_min
+    )
     w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr, train_padding)
     train_loss.block_until_ready()
 
