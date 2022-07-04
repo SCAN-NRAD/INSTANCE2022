@@ -8,9 +8,10 @@ def get_config():
     config.trainset = list(range(1, 70 + 1))
     config.testset = list(range(71, 100 + 1))
     config.path_normalization = "element"
-    config.gradient_normalization = "path"
+    config.gradient_normalization = "element"
 
     config.model = config_dict.ConfigDict()
+    config.model.name = "v1"
     config.model.dummy = False
     config.model.equivariance = "E3"
     config.model.width = 6
@@ -37,6 +38,8 @@ def get_config():
     config.optimizer.lr = 1e-3
     config.optimizer.algorithm = "adam"
     config.optimizer.lr_div_step = 99_999_999
+    config.optimizer.lr_div_factor = 0.1
+    config.optimizer.lr_div_factor_min = 1.0
 
     config.augmentation = config_dict.ConfigDict()
     config.augmentation.noise = 0.0
