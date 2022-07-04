@@ -13,6 +13,8 @@ from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
 import logging
 from loss_functions import SoftDiceLoss
+import copy
+
 
 
 def compute_dice_coefficient(mask_gt, mask_pred):
@@ -42,7 +44,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
 
     batch_size = 1
-    patience = 200
+    patience = 30
     save_only_min = True
 
     if not os.path.exists(checkpoint_path):
@@ -76,7 +78,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
     min_loss = False
     first_model = True
-    prev_model_params = None
+    prev_model = None
     prev_optimizer_state = None
 
     for epoch in range(epoch_start,epoch_end):
@@ -88,7 +90,6 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
             affine = batch['affine']
             resolution = batch['res']
             resolution = tuple([s.numpy()[0] for s in resolution])
-            print('resolution:',resolution)
             imgs = imgs.to(device=device, dtype=torch.float32)
             labels = labels.to(device=device, dtype=torch.long)
 
@@ -100,7 +101,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
             #load previous model's parameters
             if not first_model:
-                for p1, p2 in zip(prev_model_params, model.parameters()):
+                for p1, p2 in zip(prev_model.parameters(), model.parameters()):
                     with torch.no_grad():
                         p2[:] = p1
                 optimizer.load_state_dict(prev_optimizer_state)
@@ -126,8 +127,8 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
             optimizer.step()
 
             prev_optimizer_state = optimizer.state_dict() 
-            prev_model_params = model.parameters()
-
+            #prev_model_params = model.parameters()
+            prev_model = copy.deepcopy(model)
 
 
         #validation
@@ -151,10 +152,12 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
             input_irreps = "3x0e"
             model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
-            for p1, p2 in zip(prev_model_params, model.parameters()):
+
+            for p1, p2 in zip(prev_model.parameters(), model.parameters()):
                 with torch.no_grad():
                     p2[:] = p1
             model.eval()
+
 
             with torch.no_grad():
                 output = model(imgs)
@@ -255,7 +258,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
     input_irreps = "3x0e"
     model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
     model.load_state_dict(checkpoint['model_state_dict'])
-    prev_model_params = model.parameters()
+    prev_model = copy.deepcopy(model)
 
 
     dc_array = np.zeros((len(dataset),n_classes))
@@ -270,7 +273,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
 
         model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
 
-        for p1, p2 in zip(prev_model_params, model.parameters()):
+        for p1, p2 in zip(prev_model.parameters(), model.parameters()):
             with torch.no_grad():
                 p2[:] = p1
 
@@ -294,7 +297,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
 def multiresolution_experiments(checkpoint_dir,downsample,gpu):
-    train_val_multiresolution(checkpoint_dir,1000, n=3)
+    train_val_multiresolution(checkpoint_dir,300, n=3)
     predict_multiresolution(checkpoint_dir,n=3)
 
-multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_3/',3,'cuda')
+multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_full/',3,'cuda')
