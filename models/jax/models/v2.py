@@ -70,37 +70,22 @@ def create_model(config):
         del input, zooms
         x1 = x1[None]  # add a batch index
 
-        x1 = Convolution(
-            f"{4 * m}x0e + {2 * m}x1o + {1 * m}x2e",
-            diameter=0.37 * 9.0,
-            steps=z1,
-            **kw,
-        )(x1)
+        x1 = Convolution(f"{4 * m}x0e + {2 * m}x1o + {1 * m}x2e", diameter=0.37 * 9.0, steps=z1, **kw)(x1)
         x1 = e3nn.TensorSquare(irreps(m))(x1)
         x1 = e3nn.TensorSquare(f"{8 * m}x0e + {8 * m}x0o")(x1)
 
         x2, z2 = downsample((x1, z1), 0.8)
 
-        x2 = Convolution(
-            irreps(m),
-            diameter=0.8 * 9.0,
-            steps=z2,
-            **kw,
-        )(x2)
+        x2 = Convolution(irreps(m), diameter=0.8 * 9.0, steps=z2, **kw)(x2)
         x2 = e3nn.TensorSquare(irreps(2 * m))(x2)
         x2 = e3nn.TensorSquare(f"{16 * m}x0e + {16 * m}x0o")(x2)
 
         x1, _ = upsample((x1, z1), (x2, z2))
 
-        x1 = Convolution(
-            irreps(m),
-            diameter=0.37 * 9.0,
-            steps=z1,
-            **kw,
-        )(x1)
+        x1 = Convolution(irreps(m), diameter=0.37 * 9.0, steps=z1, **kw)(x1)
         x1 = e3nn.TensorSquare(irreps(m))(x1)
         x1 = e3nn.TensorSquare("1x0e")(x1)
 
-        return x1[0].contiguous
+        return x1[0].contiguous[..., 0]
 
     return model
