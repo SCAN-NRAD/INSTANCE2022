@@ -51,6 +51,8 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
     prev_model = None
     prev_optimizer_state = None
 
+    device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
+
     if LOAD_CHECK_POINT:
         first_model = False
         last_checkpoint = checkpoint_path+'/model_min.pt'
@@ -59,10 +61,10 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
         input_irreps = "3x0e"
         prev_model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
+        optimizer = torch.optim.Adam(prev_model.parameters(), lr=5e-3)
 
         prev_model.load_state_dict(checkpoint['model_state_dict'])
-        prev_optimizer_state = optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        prev_optimizer_state = checkpoint['optimizer_state_dict']
         min_ce_loss = checkpoint['loss']
 
         try:
@@ -88,7 +90,6 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
     dataset = INSTANCE_2022_3channels(training_cases, patch_size = 128,check_labels=True) 
 
-    device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
 
 
 
@@ -315,7 +316,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
 def multiresolution_experiments(checkpoint_dir,downsample,gpu):
-    train_val_multiresolution(checkpoint_dir,300, n=3)
+    train_val_multiresolution(checkpoint_dir,500, n=3,LOAD_CHECK_POINT=True)
     predict_multiresolution(checkpoint_dir,n=3)
 
 multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_full/',3,'cuda')
