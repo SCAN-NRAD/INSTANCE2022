@@ -1,4 +1,5 @@
 import os
+from re import I
 import numpy as np
 import json
 import torch
@@ -39,12 +40,42 @@ def compute_dice_coefficient(mask_gt, mask_pred):
 
 
 
-def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsample=3,gpu='cuda',equivariance='SO3',n=3):
+def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsample=3,gpu='cuda',equivariance='SO3',n=3, LOAD_CHECK_POINT = False):
 
+
+    epoch_start = 0
+    min_ce_loss = 10000
+    epochs_without_min = 0
+    min_loss = False
+    first_model = True
+    prev_model = None
+    prev_optimizer_state = None
+
+    if LOAD_CHECK_POINT:
+        first_model = False
+        last_checkpoint = checkpoint_path+'/model_min.pt'
+        checkpoint = torch.load(last_checkpoint,map_location=gpu)
+        resolution = checkpoint['resolution']
+
+        input_irreps = "3x0e"
+        prev_model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
+
+        prev_model.load_state_dict(checkpoint['model_state_dict'])
+        prev_optimizer_state = optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        min_ce_loss = checkpoint['loss']
+
+        try:
+            with open(checkpoint_path+'/training_progress.json','r') as f:
+                d = json.loads(f.read())
+                epoch_start = d['epoch'] + 1
+                epochs_without_min = d['epochs_without_min']
+        except:
+            epoch_start = checkpoint['epoch']+1
 
 
     batch_size = 1
-    patience = 30
+    patience = 100
     save_only_min = True
 
     if not os.path.exists(checkpoint_path):
@@ -60,26 +91,15 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
     device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
 
 
-    epoch_start = 0 
-    min_ce_loss = 10000
-    epochs_without_min = 0
 
     logging.basicConfig(filename=log_name, filemode='a', level=logging.INFO)
 
-    #n_val = int(len(dataset) * val_percent)
-    #n_train = len(dataset) - n_val
     train, val = random_split(dataset, [70, 20],generator=torch.Generator().manual_seed(42) )
-    #n_subtrain = int(n_train*dataset_fraction)
-    #subtrain, unused = random_split(train,[n_subtrain,n_train-n_subtrain],generator=torch.Generator().manual_seed(42) )
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=1, pin_memory=True)
     val_loader = DataLoader(val, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=True, drop_last=True)
 
     criterion = nn.CrossEntropyLoss()
 
-    min_loss = False
-    first_model = True
-    prev_model = None
-    prev_optimizer_state = None
 
     for epoch in range(epoch_start,epoch_end):
 
@@ -87,14 +107,12 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
             imgs = batch['image']
             labels = batch['label']
-            affine = batch['affine']
             resolution = batch['res']
             resolution = tuple([s.numpy()[0] for s in resolution])
             imgs = imgs.to(device=device, dtype=torch.float32)
             labels = labels.to(device=device, dtype=torch.long)
 
             #define model inside training loop
-
             input_irreps = "3x0e"
             model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
             optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
