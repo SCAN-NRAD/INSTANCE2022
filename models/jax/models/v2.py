@@ -11,6 +11,20 @@ import jax
 Zooms = Tuple[float, float, float]
 
 
+def print_stats(name, x):
+    return
+    assert isinstance(x, e3nn.IrrepsData)
+    print(
+        name,
+        x.shape,
+        " ".join(
+            f"{mulir}:" + (f"{jnp.mean(a):.1f}+{jnp.mean(a**2)**0.5:.2f}" if a is not None else "none")
+            for mulir, a in zip(x.irreps, x.list)
+        ),
+        flush=True,
+    )
+
+
 def downsample(input: Tuple[e3nn.IrrepsData, Zooms], min_zoom: float) -> Tuple[e3nn.IrrepsData, Zooms]:
     data, zooms = input
 
@@ -55,36 +69,66 @@ def create_model(config):
         Returns:
             jnp.ndarray: output data of shape ``(x, y, z)``
         """
-        kw = dict(
-            irreps_sh=e3nn.Irreps.spherical_harmonics(lmax=4, p=-1),
-            num_radial_basis={0: 4, 1: 4, 2: 3, 3: 2, 4: 1},
-            relative_starts={0: 0.0, 1: 0.0, 2: 0.25, 3: 0.5, 4: 0.75},
-        )
 
         def irreps(m):
             return f"{4 * m}x0e + {4 * m}x0o + {2 * m}x1e + {2 * m}x1o + {1 * m}x2e + {1 * m}x2o"
+
+        def conv(x, zoom, diameter, irreps):
+            return Convolution(
+                irreps,
+                diameter=diameter,
+                steps=zoom,
+                irreps_sh=e3nn.Irreps.spherical_harmonics(lmax=4, p=-1),
+                num_radial_basis={0: 4, 1: 4, 2: 3, 3: 2, 4: 1},
+                relative_starts={0: 0.0, 1: 0.0, 2: 0.25, 3: 0.5, 4: 0.75},
+            )(x)
+
+        def instance_norm(x):
+            return e3nn.BatchNorm(eps=config.instance_norm_eps, affine=False, instance=True)(x)
 
         m = config.width
         x1 = e3nn.IrrepsData.from_contiguous("3x0e", input)
         z1 = zooms
         del input, zooms
         x1 = x1[None]  # add a batch index
+        print_stats("input", x1)
 
-        x1 = Convolution(f"{4 * m}x0e + {2 * m}x1o + {1 * m}x2e", diameter=0.37 * 9.0, steps=z1, **kw)(x1)
+        x1 = conv(x1, z1, 0.37 * 9.0, f"{4 * m}x0e + {2 * m}x1o + {1 * m}x2e")
+        x1 = instance_norm(x1)
+        print_stats("conv", x1)
         x1 = e3nn.TensorSquare(irreps(m))(x1)
+        x1 = instance_norm(x1)
+        print_stats("ts", x1)
         x1 = e3nn.TensorSquare(f"{8 * m}x0e + {8 * m}x0o")(x1)
+        x1 = instance_norm(x1)
+        x1 = e3nn.scalar_activation(x1, [jax.nn.gelu, jax.nn.tanh])
+        print_stats("ts", x1)
 
         x2, z2 = downsample((x1, z1), 0.8)
+        print_stats("down", x2)
 
-        x2 = Convolution(irreps(m), diameter=0.8 * 9.0, steps=z2, **kw)(x2)
+        x2 = conv(x2, z2, 0.8 * 9.0, irreps(m))
+        x2 = instance_norm(x2)
+        print_stats("conv", x2)
         x2 = e3nn.TensorSquare(irreps(2 * m))(x2)
+        x2 = instance_norm(x2)
+        print_stats("ts", x2)
         x2 = e3nn.TensorSquare(f"{16 * m}x0e + {16 * m}x0o")(x2)
+        x2 = instance_norm(x2)
+        x2 = e3nn.scalar_activation(x2, [jax.nn.gelu, jax.nn.tanh])
+        print_stats("ts", x2)
 
         x1, _ = upsample((x1, z1), (x2, z2))
+        print_stats("up", x1)
 
-        x1 = Convolution(irreps(m), diameter=0.37 * 9.0, steps=z1, **kw)(x1)
+        x1 = conv(x1, z1, 0.37 * 9.0, irreps(m))
+        x1 = instance_norm(x1)
+        print_stats("conv", x1)
         x1 = e3nn.TensorSquare(irreps(m))(x1)
+        x1 = instance_norm(x1)
+        print_stats("ts", x1)
         x1 = e3nn.TensorSquare("1x0e")(x1)
+        print_stats("ts", x1)
 
         return x1[0].contiguous[..., 0]
 
