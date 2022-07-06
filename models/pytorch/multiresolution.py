@@ -227,7 +227,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
         if epochs_without_min > patience:
             with open(checkpoint_path+'/training_progress.json','w') as f:
-                d = {'epoch': epoch, 'epochs_without_min': epochs_without_min, 'done': True, 'ce_loss':ce_loss.item()}
+                d = {'epoch': epoch, 'epochs_without_min': epochs_without_min, 'done': True, 'ce_loss':ce_loss.item(),'min_ce_loss':min_ce_loss}
                 f.write(json.dumps(d)) 
             break
             
@@ -254,7 +254,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
         min_loss = False
 
         with open(checkpoint_path+'/training_progress.json','w') as f:
-            d = {'epoch': epoch, 'epochs_without_min': epochs_without_min, 'done': False, 'ce_loss':ce_loss.item()}
+            d = {'epoch': epoch, 'epochs_without_min': epochs_without_min, 'done': False, 'ce_loss':ce_loss.item(),'min_ce_loss':min_ce_loss}
             f.write(json.dumps(d)) 
 
 def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3):
@@ -304,6 +304,14 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
         pred_file_name = sav_dir+os.path.basename(batch['name'][0])+f'_pred.nii.gz'
         nib.save(nib.Nifti1Image(output[0],affine = batch['affine'][0].numpy()),pred_file_name)
 
+        #four_classes
+        four_classes = np.zeros(output[0].shape)
+        four_classes[(output[0] == 1) * (label == 0)] = 1 #fp
+        four_classes[(output[0] == 0) * (label == 1)] = 2 #fn
+        four_classes[(output[0] == 1) * (label == 1)] = 3 #tp
+
+        confusion_file_name = sav_dir+os.path.basename(batch['name'][0])+f'_confusion.nii.gz'
+        nib.save(nib.Nifti1Image(four_classes,affine = batch['affine'][0].numpy()),pred_file_name)
 
         dc = []
         for i in range(n_classes):
@@ -312,7 +320,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
             dc.append(compute_dice_coefficient(mask_gt,mask_pred))
 
         dc_array[batch_no] = dc
-    
+
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
 def multiresolution_experiments(checkpoint_dir,downsample,gpu):
