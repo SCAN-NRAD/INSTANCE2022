@@ -301,17 +301,18 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
         output = model.predict_3D(img.cpu().numpy(),do_mirroring=False, patch_size=(128,128,128),
                                 use_sliding_window=True, use_gaussian = True,verbose=False)
 
-        pred_file_name = sav_dir+os.path.basename(batch['name'][0])+f'_pred.nii.gz'
+        pred_file_name = sav_dir+os.path.basename(batch['name'][0]).split('.')[0]+f'_pred.nii.gz'
         nib.save(nib.Nifti1Image(output[0],affine = batch['affine'][0].numpy()),pred_file_name)
+
 
         #four_classes
         four_classes = np.zeros(output[0].shape)
-        four_classes[(output[0] == 1) * (label == 0)] = 1 #fp
-        four_classes[(output[0] == 0) * (label == 1)] = 2 #fn
-        four_classes[(output[0] == 1) * (label == 1)] = 3 #tp
+        four_classes[(output[0] == 1) * (label[0].numpy() == 0)] = 1 #fp
+        four_classes[(output[0] == 0) * (label[0].numpy() == 1)] = 2 #fn
+        four_classes[(output[0] == 1) * (label[0].numpy() == 1)] = 3 #tp
 
-        confusion_file_name = sav_dir+os.path.basename(batch['name'][0])+f'_confusion.nii.gz'
-        nib.save(nib.Nifti1Image(four_classes,affine = batch['affine'][0].numpy()),pred_file_name)
+        confusion_file_name = sav_dir+os.path.basename(batch['name'][0]).split('.')[0]+f'_confusion.nii.gz'
+        nib.save(nib.Nifti1Image(four_classes,affine = batch['affine'][0].numpy()),confusion_file_name)
 
         dc = []
         for i in range(n_classes):
@@ -324,7 +325,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
 def multiresolution_experiments(checkpoint_dir,downsample,gpu):
-    train_val_multiresolution(checkpoint_dir,500, n=3,LOAD_CHECK_POINT=True)
+    #train_val_multiresolution(checkpoint_dir,500, n=3,LOAD_CHECK_POINT=True)
     predict_multiresolution(checkpoint_dir,n=3)
 
 multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_full/',3,'cuda')
