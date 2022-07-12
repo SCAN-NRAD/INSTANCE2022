@@ -156,7 +156,7 @@ def main(_):
     state = functions.init_train_loop(config, FLAGS.data, None, 0, w, opt_state)
     print("Start main loop...", flush=True)
 
-    for step in range(99_999_999):
+    for step in range(config.train_steps):
 
         # Reload the loop function if the code has changed
         new_hash = hash_file(f"{wandb.run.dir}/functions.py")

@@ -9,6 +9,7 @@ def get_config():
     config.testset = []
     config.path_normalization = "element"
     config.gradient_normalization = "element"
+    config.train_steps = 150_000
 
     config.model = config_dict.ConfigDict()
     config.model.name = "v1"

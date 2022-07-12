@@ -306,7 +306,7 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
     if step == 120:
         jax.profiler.stop_trace()
 
-    if step % 100 == 0:
+    if step % 100 == 0 and len(state.test_set) > 0:
         c = np.zeros((len(state.test_set), 2, 2))
         for j, (i, img, lab, zooms) in enumerate(state.test_set):
             zooms = round_zooms(zooms)
