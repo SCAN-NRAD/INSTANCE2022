@@ -15,7 +15,7 @@ def get_config():
     config.model.name = "v1"
     config.model.dummy = False
     config.model.equivariance = "E3"
-    config.model.width = 6
+    config.model.width = 5
     config.model.num_radial_basis_sh = (
         2,  # L=0
         2,  # L=1
