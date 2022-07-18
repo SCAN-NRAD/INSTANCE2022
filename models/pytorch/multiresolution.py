@@ -40,7 +40,7 @@ def compute_dice_coefficient(mask_gt, mask_pred):
 
 
 
-def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsample=3,gpu='cuda',equivariance='SO3',n=3, LOAD_CHECK_POINT = False):
+def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsample=3,gpu='cuda',equivariance='SO3',n=3, save_only_min = True, LOAD_CHECK_POINT = False):
 
 
     epoch_start = 0
@@ -78,7 +78,6 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
     batch_size = 1
     patience = 100
-    save_only_min = True
 
     if not os.path.exists(checkpoint_path):
         os.makedirs(checkpoint_path)
@@ -86,7 +85,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
     writer = SummaryWriter(checkpoint_path)
 
-    training_cases = 'training_cases.txt'
+    training_cases = 'full_training_cases.txt'
 
     dataset = INSTANCE_2022_3channels(training_cases, patch_size = 128,check_labels=True) 
 
@@ -95,7 +94,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
     logging.basicConfig(filename=log_name, filemode='a', level=logging.INFO)
 
-    train, val = random_split(dataset, [70, 20],generator=torch.Generator().manual_seed(42) )
+    train, val = random_split(dataset, [100, 0],generator=torch.Generator().manual_seed(42) )
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=1, pin_memory=True)
     val_loader = DataLoader(val, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=True, drop_last=True)
 
@@ -328,4 +327,10 @@ def multiresolution_experiments(checkpoint_dir,downsample,gpu):
     #train_val_multiresolution(checkpoint_dir,500, n=3,LOAD_CHECK_POINT=True)
     predict_multiresolution(checkpoint_dir,n=3)
 
-multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_full/',3,'cuda')
+#multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_full/',3,'cuda')
+
+def multiresolution_full_training(checkpoint_dir,downsample,gpu):
+    train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False)
+    #predict_multiresolution(checkpoint_dir,n=3)
+
+multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/',3,'cuda')
