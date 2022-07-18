@@ -333,4 +333,4 @@ def multiresolution_full_training(checkpoint_dir,downsample,gpu):
     train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False)
     #predict_multiresolution(checkpoint_dir,n=3)
 
-multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/',3,'cuda')
+multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/',3,'cuda')
