@@ -67,9 +67,7 @@ def main():
         pred = eval_model(img, lambda x: apply(w, x, round_zooms(image.header.get_zooms())), overlap=2.0, verbose=True)
         print(flush=True)
 
-        nib.save(
-            nib.Nifti1Image(pred, image.affine, image.header), f"{args.path_output}/{os.path.basename(image_path)}.nii.gz"
-        )
+        nib.save(nib.Nifti1Image(pred, image.affine, image.header), f"{args.path_output}/{os.path.basename(image_path)}")
 
         if label_path is not None:
             if os.path.basename(image_path) != os.path.basename(label_path):
@@ -81,7 +79,7 @@ def main():
             four_classes = 2 * y_gt + y_pred
             nib.save(
                 nib.Nifti1Image(four_classes, label.affine, label.header),
-                f"{args.path_output}/confusion{os.path.basename(image_path)}.nii.gz",
+                f"{args.path_output}/confusion{os.path.basename(image_path)}",
             )
 
             tp = np.sum(y_pred * y_gt)
