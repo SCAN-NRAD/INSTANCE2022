@@ -15,7 +15,7 @@ import jax
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a model")
-    parser.add_argument("--path_args", type=str, required=True, help="Path to args.pkl")
+    parser.add_argument("--path_config", type=str, required=True, help="Path to config.pkl")
     parser.add_argument("--path_weights", type=str, required=True, help="Path to weights.pkl")
     parser.add_argument("--path_scripts", type=str, required=True, help="Path to python scripts")
     parser.add_argument("--path_images", type=str, required=True, help="Path to images")
@@ -30,13 +30,13 @@ def main():
     from functions import eval_model, preprocess_miccai22_image, round_zooms  # noqa: F401
 
     # Load model args
-    with open(args.path_args, "rb") as f:
-        train_args = pickle.load(f)
-    print(train_args, flush=True)
+    with open(args.path_config, "rb") as f:
+        train_config = pickle.load(f)
+    print(train_config, flush=True)
 
     @partial(jax.jit, static_argnums=(2,))
     def apply(w, x, zooms):
-        return hk.without_apply_rng(hk.transform(model.unet_with_groups(train_args))).apply(w, x, zooms)
+        return hk.without_apply_rng(hk.transform(model.create_model(train_config.model))).apply(w, x, zooms)
 
     with open(args.path_weights, "rb") as f:
         w = pickle.load(f)
