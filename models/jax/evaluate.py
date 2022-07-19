@@ -53,6 +53,10 @@ def main():
     if len(images) != len(labels):
         raise ValueError("Number of images and labels do not match")
 
+    # create output directory
+    if not os.path.exists(args.path_output):
+        os.makedirs(args.path_output)
+
     DSCs = []
 
     for image_path, label_path in zip(images, labels):
@@ -63,7 +67,9 @@ def main():
         pred = eval_model(img, lambda x: apply(w, x, round_zooms(image.header.get_zooms())), overlap=2.0, verbose=True)
         print(flush=True)
 
-        nib.save(nib.Nifti1Image(pred, image.affine, image.header), f"{args.path_output}/eval{os.path.basename(image_path)}")
+        nib.save(
+            nib.Nifti1Image(pred, image.affine, image.header), f"{args.path_output}/{os.path.basename(image_path)}.nii.gz"
+        )
 
         if label_path is not None:
             if os.path.basename(image_path) != os.path.basename(label_path):
