@@ -5,11 +5,13 @@ def get_config():
     config = config_dict.ConfigDict()
     config.seed_init = 1
     config.seed_train = 1
-    config.trainset = list(range(1, 100 + 1))
-    config.testset = []
+    config.testset = [80, 81, 82]
+    config.trainset = [i for i in range(1, 100 + 1) if i not in config.testset]
+    config.testset = config.testset + [91, 96, 98]  # hard cases
+
     config.path_normalization = "element"
     config.gradient_normalization = "element"
-    config.train_steps = 150_000
+    config.train_steps = 200_000
 
     config.model = config_dict.ConfigDict()
     config.model.name = "v1"
