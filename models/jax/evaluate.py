@@ -8,7 +8,7 @@ from functools import partial
 import haiku as hk
 import nibabel as nib
 import numpy as np
-from e3nn_jax import e3nn
+import e3nn_jax as e3nn
 
 import jax
 
