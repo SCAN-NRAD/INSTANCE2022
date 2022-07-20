@@ -198,38 +198,42 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
             tot += criterion(output, true_masks)
 
 
-        total_acc /= n_val
-        total_softdiceloss /= n_val
+        if n_val > 0:
+            total_acc /= n_val
+            total_softdiceloss /= n_val
     
 
-        logging.info((
-            f"validation: {epoch}: ce loss={tot/n_val:.3f} p(pred=i | true=i)={total_acc}"
-        ))
-        logging.info((
-            f"validation: {epoch}: dice loss={total_softdiceloss[0]:.3f}, {total_softdiceloss}"
-        ))
+            logging.info((
+                f"validation: {epoch}: ce loss={tot/n_val:.3f} p(pred=i | true=i)={total_acc}"
+            ))
+            logging.info((
+                f"validation: {epoch}: dice loss={total_softdiceloss[0]:.3f}, {total_softdiceloss}"
+            ))
 
 
-        ce_loss = tot/n_val 
+            ce_loss = tot/n_val 
 
-        writer.add_scalar('Cross_Entropy_Loss',ce_loss,epoch)
-        for c in range(model.num_classes):
-            writer.add_scalar(f'Dice_Loss/{c}',total_softdiceloss[c],epoch)
+            writer.add_scalar('Cross_Entropy_Loss',ce_loss,epoch)
+            for c in range(model.num_classes):
+                writer.add_scalar(f'Dice_Loss/{c}',total_softdiceloss[c],epoch)
         
-        if ce_loss < min_ce_loss:
-            min_loss = True
-            min_ce_loss = ce_loss
-            epochs_without_min = 0
+            if ce_loss < min_ce_loss:
+                min_loss = True
+                min_ce_loss = ce_loss
+                epochs_without_min = 0
         
-        else: 
-            epochs_without_min += 1
+            else: 
+                epochs_without_min += 1
 
-        if epochs_without_min > patience:
-            with open(checkpoint_path+'/training_progress.json','w') as f:
-                d = {'epoch': epoch, 'epochs_without_min': epochs_without_min, 'done': True, 'ce_loss':ce_loss.item(),'min_ce_loss':min_ce_loss}
-                f.write(json.dumps(d)) 
-            break
-            
+            if epochs_without_min > patience:
+                with open(checkpoint_path+'/training_progress.json','w') as f:
+                    d = {'epoch': epoch, 'epochs_without_min': epochs_without_min, 'done': True, 'ce_loss':ce_loss.item(),'min_ce_loss':min_ce_loss}
+                    f.write(json.dumps(d)) 
+                break
+
+        else:
+            ce_loss = loss
+
 
         if not save_only_min:
             torch.save({
