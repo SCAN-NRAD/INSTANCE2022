@@ -419,12 +419,8 @@ def eval_model(
     if padding is None:
         padding = sample_padding
 
-    if np.argmin(img.shape[:3]) == 0:
-        size = (size[2], size[1], size[0])
-        padding = (padding[2], padding[1], padding[0])
-    if np.argmin(img.shape[:3]) == 1:
-        size = (size[0], size[2], size[1])
-        padding = (padding[0], padding[2], padding[1])
+    assert img.shape[2] < img.shape[0]
+    assert img.shape[2] < img.shape[1]
 
     pos = np.stack(
         np.meshgrid(
