@@ -419,6 +419,9 @@ def eval_model(
     if padding is None:
         padding = sample_padding
 
+    assert img.shape[2] < img.shape[0]
+    assert img.shape[2] < img.shape[1]
+
     pos = np.stack(
         np.meshgrid(
             np.linspace(-1.3, 1.3, size[0] - 2 * padding[0]),
