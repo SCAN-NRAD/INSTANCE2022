@@ -9,7 +9,7 @@ import nibabel as nib
 from torch.utils.data import DataLoader, random_split
 from equivariant_unet_physical_units import UNet
 from train import train_one_model
-from dataset import INSTANCE_2022, INSTANCE_2022_3channels
+from dataset import INSTANCE_2022, INSTANCE_2022_3channels, INSTANCE_2022_evaluation
 from tensorboardX import SummaryWriter 
 from torch.utils.data import DataLoader
 import logging
@@ -327,6 +327,50 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
 
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
+def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3):
+
+    n_classes = 2
+
+    sav_dir = f'{checkpoint_dir}/submit/'
+    if not os.path.exists(sav_dir):
+        os.makedirs(sav_dir)
+
+    testing_cases = 'evaluation_cases.txt'
+
+    dataset = INSTANCE_2022_evaluation(testing_cases, n_channels=3,patch_size = 0) 
+    test_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
+
+    device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
+
+    checkpoint = torch.load(checkpoint_dir+'/'+model_name,map_location=gpu)
+    resolution=checkpoint['resolution']
+    input_irreps = "3x0e"
+    model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    prev_model = copy.deepcopy(model)
+    
+    for batch_no, batch in enumerate(test_loader):
+
+        img = batch['image'][0,...]
+        affine = batch['affine']
+        resolution = batch['res']
+        resolution = tuple([s.numpy()[0] for s in resolution])
+
+        model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
+
+        for p1, p2 in zip(prev_model.parameters(), model.parameters()):
+            with torch.no_grad():
+                p2[:] = p1
+
+        model.eval()
+
+        output = model.predict_3D(img.cpu().numpy(),do_mirroring=False, patch_size=(128,128,128),
+                                use_sliding_window=True, use_gaussian = True,verbose=False)
+
+        pred_file_name = sav_dir+os.path.basename(batch['name'][0])
+        nib.save(nib.Nifti1Image(output[0],affine = batch['affine'][0].numpy()),pred_file_name)
+
+
 def multiresolution_experiments(checkpoint_dir,downsample,gpu):
     #train_val_multiresolution(checkpoint_dir,500, n=3,LOAD_CHECK_POINT=True)
     predict_multiresolution(checkpoint_dir,n=3)
@@ -337,4 +381,6 @@ def multiresolution_full_training(checkpoint_dir,downsample,gpu):
     train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False)
     #predict_multiresolution(checkpoint_dir,n=3)
 
-multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/',3,'cuda')
+#multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/',3,'cuda')
+
+predict_evaluation('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/', 'model_058.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)

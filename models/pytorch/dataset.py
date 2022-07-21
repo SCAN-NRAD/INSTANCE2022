@@ -179,6 +179,7 @@ class INSTANCE_2022_3channels(Dataset):
         #clamp and scale channel 1
         channels[1,...][img<-50] = -50
         channels[1,...][img>220] = 220
+        channels[1,...]+=50
         channels[1,...] = channels[1,...] / 270
 
         #clamp and scale channel 2
@@ -229,3 +230,78 @@ class INSTANCE_2022_3channels(Dataset):
                     patchFound = True
         
         return output_array, output_label
+
+class INSTANCE_2022_evaluation(Dataset):
+    def __init__(self, cases_file = None, nchannels = 1, patch_size = 0,check_labels=False):
+
+        if os.uname()[1] == 'scanwkp11':
+            self.base_dir = '/str/nas/INSTANCE2022/'
+        else:
+            self.base_dir = '/home/diaz/data/'
+
+        if cases_file is not None:
+            with open(cases_file) as f:
+                self.ids = [line.rstrip('\n') for line in f]
+        else:
+            #Load entire dataset
+            self.ids = os.listdir(os.path.join(self.base_dir,'rawdata'))
+
+        self.patch_size = patch_size
+        self.check_labels = check_labels
+        self.nchannels = nchannels
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __getitem__(self, i):
+        idx = self.ids[i]
+
+
+        img_file = glob(os.path.join(self.base_dir, f'evaluation/{idx}'))
+
+        assert len(img_file) == 1, \
+            f'Either no image or multiple images found for the ID {idx}: {img_file}'
+
+        img = nib.load(img_file[0])
+        img_affine = img.affine
+        res = img.header.get_zooms()
+
+        img = img.get_fdata()
+
+        if self.nchannels == 1:
+            #clamp and scale
+            img[img<0] = 0
+            img[img>80] = 80
+            img = img / 80
+            channels = img
+
+        elif self.nchannels == 3:
+            channels = np.zeros((3,*img.shape))
+            channels[0,...] = img
+            channels[1,...] = img
+            channels[2,...] = img
+
+            #clamp and scale channel 0
+            channels[0,...][img<0] = 0
+            channels[0,...][img>80] = 80
+            channels[0,...] = channels[0,...] / 80
+
+            #clamp and scale channel 1
+            channels[1,...][img<-50] = -50
+            channels[1,...][img>220] = 220
+            channels[1,...]+=50
+            channels[1,...] = channels[1,...] / 270
+
+            #clamp and scale channel 2
+            channels[2,...][img<0] = 0
+            channels[2,...][img>1000] = 1000
+            channels[2,...] = channels[2,...] / 1000
+
+        channels = torch.from_numpy(channels).type(torch.float32)
+
+        return {
+            'image': channels,
+            'name' : idx,
+            'affine': img_affine,
+            'res': res
+        }
