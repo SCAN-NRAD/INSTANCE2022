@@ -7,7 +7,7 @@ import nibabel as nib
 from torch.utils.data import DataLoader
 from equivariant_unet_physical_units import UNet
 from train import train_one_model
-from dataset import INSTANCE_2022, INSTANCE_2022_3channels
+from dataset import INSTANCE_2022, INSTANCE_2022_3channels, INSTANCE_2022_evaluation
 from tensorboardX import SummaryWriter 
 from torch.utils.data import DataLoader
 
@@ -186,3 +186,33 @@ def three_channel_experiments(checkpoint_dir,downsample,gpu):
     predict_equivariant_3channel(checkpoint_dir,gpu,downsample=downsample,n=3)
 
 three_channel_experiments('/home/diaz/experiments/INSTANCE2022_3channel_n3',3,'cuda')
+
+def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3):
+
+    n_classes = 2
+
+    sav_dir = f'{checkpoint_dir}/submit/'
+    if not os.path.exists(sav_dir):
+        os.makedirs(sav_dir)
+
+    testing_cases = 'evaluation_cases.txt'
+
+    dataset = INSTANCE_2022_evaluation(testing_cases, nchannels=1,patch_size = 0) 
+    test_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
+
+    device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
+
+    checkpoint = torch.load(checkpoint_dir+'/'+model_name,map_location=gpu)
+    input_irreps = "1x0e"
+    model = UNet(2,0,5,5,(0.5,0.5,5),n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()
+    
+    for batch_no, batch in enumerate(test_loader):
+
+        img = batch['image'][0,...]
+        output = model.predict_3D(img.cpu().numpy(),do_mirroring=False, patch_size=(128,128,128),
+                                use_sliding_window=True, use_gaussian = True,verbose=False)
+
+        pred_file_name = sav_dir+os.path.basename(batch['name'][0])
+        nib.save(nib.Nifti1Image(output[0],affine = batch['affine'][0].numpy()),pred_file_name)
