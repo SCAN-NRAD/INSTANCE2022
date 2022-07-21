@@ -185,7 +185,7 @@ def three_channel_experiments(checkpoint_dir,downsample,gpu):
     train_equivariant_3channel(checkpoint_dir,200,'right',downsample=downsample,gpu=gpu,n=3)
     predict_equivariant_3channel(checkpoint_dir,gpu,downsample=downsample,n=3)
 
-three_channel_experiments('/home/diaz/experiments/INSTANCE2022_3channel_n3',3,'cuda')
+#three_channel_experiments('/home/diaz/experiments/INSTANCE2022_3channel_n3',3,'cuda')
 
 def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3):
 
@@ -216,3 +216,5 @@ def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, c
 
         pred_file_name = sav_dir+os.path.basename(batch['name'][0])
         nib.save(nib.Nifti1Image(output[0],affine = batch['affine'][0].numpy()),pred_file_name)
+
+predict_evaluation('/home/diaz/experiments/INSTANCE2022_n3', 'model_min.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
