@@ -9,7 +9,7 @@ import nibabel as nib
 from torch.utils.data import DataLoader, random_split
 from equivariant_unet_physical_units import UNet
 from train import train_one_model
-from dataset import INSTANCE_2022, INSTANCE_2022_3channels, INSTANCE_2022_evaluation
+from dataset import INSTANCE_2022_3channels, INSTANCE_2022_evaluation
 from tensorboardX import SummaryWriter 
 from torch.utils.data import DataLoader
 import logging
@@ -337,7 +337,7 @@ def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, c
 
     testing_cases = 'evaluation_cases.txt'
 
-    dataset = INSTANCE_2022_evaluation(testing_cases, n_channels=3,patch_size = 0) 
+    dataset = INSTANCE_2022_evaluation(testing_cases, nchannels=3,patch_size = 0) 
     test_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
 
     device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
