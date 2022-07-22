@@ -273,7 +273,7 @@ class INSTANCE_2022_evaluation(Dataset):
             img[img<0] = 0
             img[img>80] = 80
             img = img / 80
-            channels = img
+            channels = np.expand_dims(img, 0)
 
         elif self.nchannels == 3:
             channels = np.zeros((3,*img.shape))
