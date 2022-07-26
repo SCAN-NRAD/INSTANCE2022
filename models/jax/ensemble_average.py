@@ -39,6 +39,10 @@ def main():
     if not os.path.exists(args.path_output):
         os.makedirs(args.path_output)
 
+    if args.path_output_float is not None:
+        if not os.path.exists(args.path_output_float):
+            os.makedirs(args.path_output_float)
+
     for name, preds in predictions.items():
         x = np.mean(preds, axis=0)
         print(f"{name} {len(preds)} {x.shape} {np.min(x)} {np.max(x)}", flush=True)
