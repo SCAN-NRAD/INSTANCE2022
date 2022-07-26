@@ -11,6 +11,7 @@ def main():
     parser = argparse.ArgumentParser(description="Ensemble average")
     parser.add_argument("--path_predictions", type=str, required=True, nargs="+", help="Path to predictions")
     parser.add_argument("--path_output", type=str, required=True, help="Path to output")
+    parser.add_argument("--path_output_float", type=str, required=False, help="Path to output")
 
     parser.add_argument("--threshold", type=float, default=0.0, help="Threshold for segmentation")
     args = parser.parse_args()
@@ -41,11 +42,16 @@ def main():
     for name, preds in predictions.items():
         x = np.mean(preds, axis=0)
         print(f"{name} {len(preds)} {x.shape} {np.min(x)} {np.max(x)}", flush=True)
+
+        if args.path_output_float is not None:
+            path = os.path.join(args.path_output_float, name)
+            nib.save(nib.Nifti1Image(x, affine_headers[name][0], affine_headers[name][1]), path)
+
         x = (np.sign(x - args.threshold) + 1) / 2
         x = x.astype(np.uint8)
 
-        img = nib.Nifti1Image(x, affine_headers[name][0], affine_headers[name][1])
-        nib.save(img, f"{args.path_output}/{name}")
+        path = os.path.join(args.path_output, name)
+        nib.save(nib.Nifti1Image(x, affine_headers[name][0], affine_headers[name][1]), path)
 
 
 if __name__ == "__main__":
