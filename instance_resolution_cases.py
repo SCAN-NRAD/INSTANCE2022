@@ -94,3 +94,18 @@ def out(segmentation, outputpath, imagepath):
 for f, i in zip(files,imagepaths):
     img = nib.load(f).get_fdata()
     out(img,'temp/'+f, i)
+#%%
+import numpy as np
+import nibabel as nib
+import glob
+files = glob.glob('*nii.gz')
+files.sort()
+imagepaths = glob.glob('/str/nas/INSTANCE2022/evaluation/*.nii.gz')
+imagepaths.sort()
+for f, i in zip(files,imagepaths):
+    img = nib.load(f).get_fdata()
+    img  = img.astype(np.uint8)
+    orig = nib.load(i)
+    nib.save(nib.Nifti1Image(img,affine = orig.affine, header=orig.header),f)
+
+
