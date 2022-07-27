@@ -9,7 +9,7 @@ import nibabel as nib
 from torch.utils.data import DataLoader, random_split
 from equivariant_unet_physical_units import UNet
 from train import train_one_model
-from dataset import INSTANCE_2022_3channels, INSTANCE_2022_evaluation
+from dataset import INSTANCE_2022_3channels, INSTANCE_2022_evaluation, INSTANCE_2022
 from tensorboardX import SummaryWriter 
 from torch.utils.data import DataLoader
 import logging
@@ -40,7 +40,7 @@ def compute_dice_coefficient(mask_gt, mask_pred):
 
 
 
-def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsample=3,gpu='cuda',equivariance='SO3',n=3, save_only_min = True, LOAD_CHECK_POINT = False):
+def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsample=3,gpu='cuda',equivariance='SO3',n=3, save_only_min = True, LOAD_CHECK_POINT = False,channels = 1):
 
 
     epoch_start = 0
@@ -59,7 +59,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
         checkpoint = torch.load(last_checkpoint,map_location=gpu)
         resolution = checkpoint['resolution']
 
-        input_irreps = "3x0e"
+        input_irreps = f"{channels}x0e"
         prev_model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
         optimizer = torch.optim.Adam(prev_model.parameters(), lr=5e-3)
 
@@ -87,7 +87,10 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
     training_cases = 'full_training_cases.txt'
 
-    dataset = INSTANCE_2022_3channels(training_cases, patch_size = 128,check_labels=True) 
+    if channels == 1:
+        dataset = INSTANCE_2022(training_cases, patch_size = 128,check_labels=True) 
+    elif channels == 3:
+        dataset = INSTANCE_2022_3channels(training_cases, patch_size = 128,check_labels=True) 
 
 
 
@@ -132,6 +135,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
             out = model(imgs)
             loss = criterion(out, labels)
 
+            writer.add_scalar('Cross_Entropy_Loss',loss,epoch*100+batch_no)
             correct = (out.argmax(1) == labels)
             acc = [correct[labels == i].double().mean().item() for i in range(model.num_classes)]
 
@@ -196,6 +200,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
                 except:
                     total_softdiceloss[label] += SoftDiceLoss()(pred[:,label,:,:].unsqueeze(0),one_hot_true_masks[...,label].unsqueeze(0)).item()
             tot += criterion(output, true_masks)
+
 
 
         if n_val > 0:
@@ -327,7 +332,7 @@ def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='
 
     np.save(f'{sav_dir}/dice.npy',dc_array)
 
-def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3):
+def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3,nchannels=3):
 
     n_classes = 2
 
@@ -337,14 +342,14 @@ def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, c
 
     testing_cases = 'evaluation_cases.txt'
 
-    dataset = INSTANCE_2022_evaluation(testing_cases, nchannels=3,patch_size = 0) 
+    dataset = INSTANCE_2022_evaluation(testing_cases, nchannels=nchannels,patch_size = 0) 
     test_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
 
     device = torch.device(gpu if torch.cuda.is_available() else 'cpu')
 
     checkpoint = torch.load(checkpoint_dir+'/'+model_name,map_location=gpu)
     resolution=checkpoint['resolution']
-    input_irreps = "3x0e"
+    input_irreps = f"{nchannels}x0e"
     model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
     model.load_state_dict(checkpoint['model_state_dict'])
     prev_model = copy.deepcopy(model)
@@ -372,15 +377,20 @@ def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, c
 
 
 def multiresolution_experiments(checkpoint_dir,downsample,gpu):
-    #train_val_multiresolution(checkpoint_dir,500, n=3,LOAD_CHECK_POINT=True)
+    #train_val_multiresolution(checkpoint_dir,500, n=3,LOAD_CHECK_POINT=True,channels=3)
     predict_multiresolution(checkpoint_dir,n=3)
 
 #multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_full/',3,'cuda')
 
 def multiresolution_full_training(checkpoint_dir,downsample,gpu):
-    train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False)
+    train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False,channels=3)
     #predict_multiresolution(checkpoint_dir,n=3)
 
 #multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/',3,'cuda')
 
-predict_evaluation('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/', 'model_058.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
+#predict_evaluation('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/', 'model_058.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
+
+def multiresolution_full_training_one_channel(checkpoint_dir,downsample,gpu):
+    train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False,channels=1)
+
+multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/',3,'cuda')
