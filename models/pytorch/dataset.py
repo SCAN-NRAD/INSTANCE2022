@@ -16,6 +16,8 @@ class INSTANCE_2022(Dataset):
 
         if os.uname()[1] == 'scanwkp11':
             self.base_dir = '/str/nas/INSTANCE2022/'
+        elif os.uname()[1] == 'mb-neuro-03':
+            self.base_dir = '/data/datasets/INSTANCE2022/'
         else:
             self.base_dir = '/home/diaz/data/'
 
@@ -118,6 +120,8 @@ class INSTANCE_2022_3channels(Dataset):
 
         if os.uname()[1] == 'scanwkp11':
             self.base_dir = '/str/nas/INSTANCE2022/'
+        elif os.uname()[1] == 'mb-neuro-03':
+            self.base_dir = '/data/datasets/INSTANCE2022/'
         else:
             self.base_dir = '/home/diaz/data/'
 
@@ -236,6 +240,8 @@ class INSTANCE_2022_evaluation(Dataset):
 
         if os.uname()[1] == 'scanwkp11':
             self.base_dir = '/str/nas/INSTANCE2022/'
+        elif os.uname()[1] == 'mb-neuro-03':
+            self.base_dir = '/data/datasets/INSTANCE2022/'
         else:
             self.base_dir = '/home/diaz/data/'
 
