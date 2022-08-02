@@ -418,6 +418,9 @@ def eval_model(
 ) -> np.ndarray:
     assert img.ndim == 3 + 1
 
+    smaller_axis = np.argmin(img.shape[:3])
+    img = jnp.moveaxis(img, smaller_axis, 2)
+
     if size is None:
         size = sample_size
     if padding is None:
@@ -467,4 +470,6 @@ def eval_model(
     sum[num == 0] = negative_value
     num[num == 0] = 1.0
 
-    return sum / num
+    output = sum / num
+    output = jnp.moveaxis(output, 2, smaller_axis)
+    return output
