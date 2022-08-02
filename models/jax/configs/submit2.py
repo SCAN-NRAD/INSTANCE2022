@@ -12,7 +12,7 @@ def get_config():
     config.path_normalization = "element"
     config.gradient_normalization = "element"
     config.train_steps = 200_000
-    config.weight_avg = 1.0
+    config.weight_avg = 1 / 100_000
 
     config.model = config_dict.ConfigDict()
     config.model.name = "v1"

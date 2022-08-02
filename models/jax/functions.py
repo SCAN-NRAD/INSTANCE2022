@@ -172,15 +172,7 @@ def confusion_matrix(y: jnp.ndarray, p: jnp.ndarray) -> jnp.ndarray:
 
 TrainState = namedtuple(
     "TrainState",
-    [
-        "time0",
-        "train_set",
-        "test_set",
-        "t4",
-        "losses",
-        "best_sorted_dices",
-        "rng",
-    ],
+    ["time0", "train_set", "test_set", "t4", "losses", "best_sorted_dices", "rng", "w_eval"],
 )
 
 
@@ -209,6 +201,7 @@ def init_train_loop(config, data_path, old_state, step, w, opt_state) -> TrainSt
         losses=getattr(old_state, "losses", np.ones((len(train_set),))),
         best_sorted_dices=getattr(old_state, "best_sorted_dices", np.zeros((len(test_set),))),
         rng=getattr(old_state, "rng", jax.random.PRNGKey(config.seed_train)),
+        w_eval=getattr(old_state, "w_eval", w),
     )
 
 
@@ -279,6 +272,8 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
     w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr, train_padding)
     train_loss.block_until_ready()
 
+    w_eval = jax.tree_map(lambda x, y: (1.0 - config.weight_avg) * x + config.weight_avg * y, state.w_eval, w)
+
     t2 = time.perf_counter()
     c = np.array(confusion_matrix(unpad(lab, sample_padding), unpad(train_pred, sample_padding)))
     with np.errstate(invalid="ignore"):
@@ -302,6 +297,8 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
     if step % 500 == 0:
         with open(f"{wandb.run.dir}/w.pkl", "wb") as f:
             pickle.dump(w, f)
+        with open(f"{wandb.run.dir}/w_eval.pkl", "wb") as f:
+            pickle.dump(w_eval, f)
 
     if step == 120:
         jax.profiler.stop_trace()
@@ -310,7 +307,7 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
         c = np.zeros((len(state.test_set), 2, 2))
         for j, (i, img, lab, zooms) in enumerate(state.test_set):
             zooms = round_zooms(zooms)
-            test_pred = eval_model(img, lambda x: apply_model(w, x, zooms))
+            test_pred = eval_model(img, lambda x: apply_model(w_eval, x, zooms))
             c[j] = np.array(confusion_matrix(lab, test_pred))
 
         with np.errstate(invalid="ignore"):
@@ -324,7 +321,7 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
                 state.best_sorted_dices[i] = new_dice
                 wandb.log({f"best{i}_min_dice": new_dice}, commit=False, step=step)
                 with open(f"{wandb.run.dir}/best{i}_w.pkl", "wb") as f:
-                    pickle.dump(w, f)
+                    pickle.dump(w_eval, f)
 
         dice_txt = ",".join(f"{100 * d:02.0f}" for d in dice)
         best_dice_txt = ",".join(f"{100 * d:02.0f}" for d in state.best_sorted_dices)
@@ -384,6 +381,7 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
         losses=state.losses,
         best_sorted_dices=state.best_sorted_dices,
         rng=rng,
+        w_eval=w_eval,
     )
     return (state, w, opt_state)
 
