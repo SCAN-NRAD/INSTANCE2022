@@ -179,11 +179,17 @@ TrainState = namedtuple(
 def init_train_loop(config, data_path, old_state, step, w, opt_state) -> TrainState:
     print("Prepare for the training loop...", flush=True)
 
-    train_set = [(i,) + load_miccai22(data_path, i) for i in config.trainset]
+    if config.seed_shuffle_data is None:
+        indices = list(range(100))
+    else:
+        indices = jax.random.permutation(jax.random.PRNGKey(config.seed_shuffle_data), 100)
+        indices = [int(i) for i in indices]
+
+    train_set = [(i,) + load_miccai22(data_path, i) for i in indices[: config.trainset]]
 
     test_set = []
     test_sample_size = np.array([200, 200, 25])
-    for i in config.testset:
+    for i in indices[::-1][: config.testset]:
         img, lab, zooms = load_miccai22(data_path, i)  # test data
         center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
         start = np.maximum(center_of_mass - test_sample_size // 2, 0)
