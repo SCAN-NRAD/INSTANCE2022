@@ -393,4 +393,5 @@ def multiresolution_full_training(checkpoint_dir,downsample,gpu):
 def multiresolution_full_training_one_channel(checkpoint_dir,downsample,gpu):
     train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False,channels=1)
 
-multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/',3,'cuda')
+#multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/',3,'cuda')
+multiresolution_full_training_one_channel('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/',3,'cuda')
