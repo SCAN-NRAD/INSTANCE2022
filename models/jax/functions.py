@@ -194,7 +194,8 @@ def init_train_loop(config, data_path, old_state, step, w, opt_state) -> TrainSt
         center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
         start = np.maximum(center_of_mass - test_sample_size // 2, 0)
         end = np.minimum(start + test_sample_size, np.array(img.shape[:3]))
-        start = end - test_sample_size
+        start = np.maximum(end - test_sample_size, 0)
+
         img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         test_set.append((i, img, lab, zooms))
