@@ -9,13 +9,13 @@ def get_config():
     config.testset = 20
     config.trainset = 80
 
-    config.path_normalization = "element"
-    config.gradient_normalization = "element"
     config.train_steps = 200_000
     config.weight_avg = 1 / 20_000
 
     config.model = config_dict.ConfigDict()
     config.model.name = "v1"
+    config.model.path_normalization = "element"
+    config.model.gradient_normalization = "element"
     config.model.dummy = False
     config.model.equivariance = "E3"
     config.model.width = 5

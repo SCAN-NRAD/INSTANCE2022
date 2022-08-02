@@ -8,7 +8,6 @@ from functools import partial
 import haiku as hk
 import nibabel as nib
 import numpy as np
-import e3nn_jax as e3nn
 
 import jax
 
@@ -33,9 +32,6 @@ def main():
     with open(args.path_config, "rb") as f:
         train_config = pickle.load(f)
     print(train_config, flush=True)
-
-    e3nn.config("path_normalization", train_config.path_normalization)
-    e3nn.config("gradient_normalization", train_config.gradient_normalization)
 
     @partial(jax.jit, static_argnums=(2,))
     def apply(w, x, zooms):

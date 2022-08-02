@@ -113,6 +113,9 @@ def bn(x: e3nn.IrrepsData, eps: float) -> e3nn.IrrepsData:
 def create_model(config):
     assert config.equivariance in ["E3", "SE3"]
 
+    e3nn.config("path_normalization", config.path_normalization)
+    e3nn.config("gradient_normalization", config.gradient_normalization)
+
     def f(input: jnp.ndarray, zooms: Tuple[float, float, float]) -> jnp.ndarray:
         r"""Unet with irreps regrouped into chunks of varying size through the network.
 
