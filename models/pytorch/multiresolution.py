@@ -116,7 +116,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
             labels = labels.to(device=device, dtype=torch.long)
 
             #define model inside training loop
-            input_irreps = "3x0e"
+            input_irreps = f"{channels}x0e"
             model = UNet(2,0,5,5,resolution,n=n,n_downsample = downsample,equivariance=equivariance,input_irreps=input_irreps,cutoff=cutoff).to(device)
             optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
 
