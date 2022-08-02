@@ -180,9 +180,9 @@ def init_train_loop(config, data_path, old_state, step, w, opt_state) -> TrainSt
     print("Prepare for the training loop...", flush=True)
 
     if config.seed_shuffle_data is None:
-        indices = list(range(100))
+        indices = list(range(1, 101))
     else:
-        indices = jax.random.permutation(jax.random.PRNGKey(config.seed_shuffle_data), 100)
+        indices = jax.random.permutation(jax.random.PRNGKey(config.seed_shuffle_data), 100) + 1
         indices = [int(i) for i in indices]
 
     train_set = [(i,) + load_miccai22(data_path, i) for i in indices[: config.trainset]]
