@@ -14,7 +14,7 @@ import jax.numpy as jnp
 @dataclasses.dataclass(frozen=True)
 class Voxels:
     zooms: Tuple[float, float, float]
-    data: e3nn.IrrepsData
+    data: e3nn.IrrepsArray
 
 
 jax.tree_util.register_pytree_node(
@@ -26,7 +26,7 @@ jax.tree_util.register_pytree_node(
 
 def downsample(input: Voxels, min_zoom: float) -> Voxels:
     z_in = np.array(input.zooms)
-    s_in = np.array(input.data.shape[-3:])
+    s_in = np.array(input.data.shape[-4:-1])
 
     s_out = np.floor(s_in * z_in / np.maximum(z_in, min_zoom)).astype(int)
     z_out = z_in * s_in / s_out
@@ -35,9 +35,9 @@ def downsample(input: Voxels, min_zoom: float) -> Voxels:
 
     return Voxels(
         zooms=z_out,
-        data=e3nn.IrrepsData.from_contiguous(
+        data=e3nn.IrrepsArray(
             input.data.irreps,
-            jax.vmap(lambda x: zoom(x, output_size=s_out), -1, -1)(input.data.contiguous),
+            jax.vmap(lambda x: zoom(x, output_size=s_out), -1, -1)(input.data.array),
         ),
     )
 
@@ -45,14 +45,14 @@ def downsample(input: Voxels, min_zoom: float) -> Voxels:
 def upsample(input: Voxels, zooms: Tuple[float, float, float], size: Tuple[int, int, int]) -> Voxels:
     output = Voxels(
         zooms=zooms,
-        data=e3nn.IrrepsData.from_contiguous(
+        data=e3nn.IrrepsArray(
             input.data.irreps,
-            jax.vmap(lambda x: zoom(x, output_size=size), -1, -1)(input.data.contiguous),
+            jax.vmap(lambda x: zoom(x, output_size=size), -1, -1)(input.data.array),
         ),
     )
     assert np.allclose(
         output.zooms,
-        np.array(input.zooms) * np.array(input.data.shape[-3:]) / np.array(output.data.shape[-3:]),
+        np.array(input.zooms) * np.array(input.data.shape[-4:-1]) / np.array(output.data.shape[-4:-1]),
     )
     return output
 
@@ -67,7 +67,7 @@ def print_stats(name, x):
     return
     if isinstance(x, Voxels):
         x = x.data
-    assert isinstance(x, e3nn.IrrepsData)
+    assert isinstance(x, e3nn.IrrepsArray)
     print(
         name,
         x.shape,
@@ -82,14 +82,14 @@ class MixChannels(hk.Module):
         self.output_size = output_size
         self.output_irreps = e3nn.Irreps(output_irreps)
 
-    def __call__(self, input: e3nn.IrrepsData) -> e3nn.IrrepsData:
-        assert len(input.shape) == 1
+    def __call__(self, input: e3nn.IrrepsArray) -> e3nn.IrrepsArray:
+        assert len(input.shape) == 1 + 1
         input = input.repeat_mul_by_last_axis()
         output = e3nn.Linear([(self.output_size * mul, ir) for mul, ir in self.output_irreps])(input)
         return output.factor_mul_to_last_axis(self.output_size)
 
 
-def g(x: e3nn.IrrepsData) -> e3nn.IrrepsData:
+def g(x: e3nn.IrrepsArray) -> e3nn.IrrepsArray:
     return e3nn.gate(
         x,
         even_act=jax.nn.gelu,
@@ -99,14 +99,14 @@ def g(x: e3nn.IrrepsData) -> e3nn.IrrepsData:
     )
 
 
-def bn(x: e3nn.IrrepsData, eps: float) -> e3nn.IrrepsData:
+def bn(x: e3nn.IrrepsArray, eps: float) -> e3nn.IrrepsArray:
     if eps >= 1:
         return x
 
     f = e3nn.BatchNorm(instance=True, eps=eps)
-    if x.ndim == 1 + 3:
-        return f(x)
     if x.ndim == 1 + 3 + 1:
+        return f(x)
+    if x.ndim == 1 + 3 + 1 + 1:
         return jax.vmap(f, 4, 4)(x)
 
 
@@ -136,7 +136,7 @@ def create_model(config):
 
         def cbg(vox: Voxels, mul: float, *, radius: float, filter=None) -> Voxels:
             mul = round(mul)
-            assert len(vox.data.shape) == 1 + 3 + 1  # (batch, x, y, z, channel)
+            assert len(vox.data.shape) == 1 + 3 + 1 + 1  # (batch, x, y, z, channel, irreps)
 
             if config.equivariance == "E3":
                 irreps_a = e3nn.Irreps("4x0e + 4x0o")
@@ -170,23 +170,23 @@ def create_model(config):
             return Voxels(zooms=vox.zooms, data=x)
 
         def down(vox, min_zoom):
-            assert len(vox.data.shape) == 1 + 3 + 1  # (batch, x, y, z, channel)
+            assert len(vox.data.shape) == 1 + 3 + 1 + 1  # (batch, x, y, z, channel, irreps)
             return jax.vmap(lambda x: downsample(x, min_zoom), 4, 4)(vox)
 
         def cat(vox1: Voxels, vox2: Voxels) -> Voxels:
-            assert len(vox1.data.shape) == 1 + 3 + 1
-            assert len(vox2.data.shape) == 1 + 3 + 1
+            assert len(vox1.data.shape) == 1 + 3 + 1 + 1
+            assert len(vox2.data.shape) == 1 + 3 + 1 + 1
             assert vox1.zooms == vox2.zooms
             assert vox1.data.irreps == vox2.data.irreps
-            return Voxels(zooms=vox1.zooms, data=e3nn.IrrepsData.cat([vox1.data, vox2.data], axis=-1))
+            return Voxels(zooms=vox1.zooms, data=e3nn.IrrepsArray.cat([vox1.data, vox2.data], axis=-2))
 
         def upcat(low_vox: Voxels, high_vox: Voxels) -> Voxels:
-            assert len(low_vox.data.shape) == 1 + 3 + 1
+            assert len(low_vox.data.shape) == 1 + 3 + 1 + 1
             vox = jax.vmap(lambda x: upsample(x, high_vox.zooms, high_vox.data.shape[1:4]), 4, 4)(low_vox)
             return cat(vox, high_vox)
 
         def group_conv(vox: Voxels, *, irreps: e3nn.Irreps, mul: int, radius: float) -> Voxels:
-            assert len(vox.data.shape) == 1 + 3 + 1
+            assert len(vox.data.shape) == 1 + 3 + 1 + 1
             x = vox.data
             x = n_vmap(1 + 3, MixChannels(mul, x.irreps))(x)
             x = jax.vmap(Convolution(irreps, diameter=2.0 * radius, steps=vox.zooms, **kw), 4, 4)(x)
@@ -196,7 +196,7 @@ def create_model(config):
 
         assert input.ndim == 3 + 1
         x = Voxels(
-            zooms=zooms, data=e3nn.IrrepsData.from_contiguous("0e", input[None, :, :, :, :, None])
+            zooms=zooms, data=e3nn.IrrepsArray("0e", input[None, :, :, :, :, None])
         )  # Voxel of shape (batch, x, y, z, channel, irreps)
 
         min_zoom = config.min_zoom
@@ -229,7 +229,7 @@ def create_model(config):
             x = bn(x, config.instance_norm_eps)
             x = g(x)
             x = n_vmap(1 + 3, e3nn.Linear("0e"))(x)
-            return x.contiguous[0, :, :, :, 0]
+            return x.array[0, :, :, :, 0]
 
         # Block B
         print_stats("Block B", x)
@@ -287,6 +287,6 @@ def create_model(config):
 
         print_stats("output", x)
 
-        return x.contiguous[0, :, :, :, 0]
+        return x.array[0, :, :, :, 0]
 
     return f
