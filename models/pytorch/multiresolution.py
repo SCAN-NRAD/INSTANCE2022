@@ -1,3 +1,4 @@
+from glob import glob
 import os
 from re import I
 import numpy as np
@@ -55,7 +56,13 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
 
     if LOAD_CHECK_POINT:
         first_model = False
-        last_checkpoint = checkpoint_path+'/model_min.pt'
+        if os.path.exists(checkpoint_path+'/model_min.pt'):
+            last_checkpoint = checkpoint_path+'/model_min.pt'
+        else:
+            checkpoints = glob.glob(checkpoint_path+'/model*.pt')
+            checkpoints.sort()
+            last_checkpoint = checkpoints[-1]
+            
         checkpoint = torch.load(last_checkpoint,map_location=gpu)
         resolution = checkpoint['resolution']
 
@@ -391,7 +398,7 @@ def multiresolution_full_training(checkpoint_dir,downsample,gpu):
 #predict_evaluation('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/', 'model_058.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
 
 def multiresolution_full_training_one_channel(checkpoint_dir,downsample,gpu):
-    train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False,channels=1)
+    train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False,LOAD_CHECK_POINT=True, channels=1)
 
 #multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/',3,'cuda')
 multiresolution_full_training_one_channel('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/',3,'cuda')
