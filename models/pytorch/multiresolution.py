@@ -59,7 +59,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
         if os.path.exists(checkpoint_path+'/model_min.pt'):
             last_checkpoint = checkpoint_path+'/model_min.pt'
         else:
-            checkpoints = glob.glob(checkpoint_path+'/model*.pt')
+            checkpoints = glob(checkpoint_path+'/model*.pt')
             checkpoints.sort()
             last_checkpoint = checkpoints[-1]
             
