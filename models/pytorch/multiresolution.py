@@ -269,7 +269,7 @@ def train_val_multiresolution(checkpoint_path, epoch_end,cutoff='right',downsamp
         min_loss = False
 
         with open(checkpoint_path+'/training_progress.json','w') as f:
-            d = {'epoch': epoch, 'epochs_without_min': epochs_without_min, 'done': False, 'ce_loss':ce_loss.item(),'min_ce_loss':min_ce_loss}
+            d = {'epoch': epoch, 'epochs_without_min': epochs_without_min, 'done': False, 'ce_loss':ce_loss.item(),'min_ce_loss':min_ce_loss.item()}
             f.write(json.dumps(d)) 
 
 def predict_multiresolution(checkpoint_dir, gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3):
@@ -390,7 +390,7 @@ def multiresolution_experiments(checkpoint_dir,downsample,gpu):
 #multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_full/',3,'cuda')
 
 def multiresolution_full_training(checkpoint_dir,downsample,gpu):
-    train_val_multiresolution(checkpoint_dir,500, n=3,gpu=gpu,save_only_min=False,LOAD_CHECKPOINT=True,channels=3)
+    train_val_multiresolution(checkpoint_dir,500, n=3,gpu=gpu,save_only_min=False,LOAD_CHECK_POINT=True,channels=3)
     #predict_multiresolution(checkpoint_dir,n=3)
 
 #multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/',3,'cuda')
