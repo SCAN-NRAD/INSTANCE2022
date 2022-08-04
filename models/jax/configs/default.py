@@ -5,14 +5,16 @@ def get_config():
     config = config_dict.ConfigDict()
     config.seed_init = 1
     config.seed_train = 1
-    config.trainset = list(range(1, 70 + 1))
-    config.testset = list(range(71, 100 + 1))
-    config.path_normalization = "element"
-    config.gradient_normalization = "element"
+    config.seed_shuffle_data = None
+    config.trainset = 70
+    config.testset = 30
     config.weight_avg = 1.0
+    config.train_steps = 200_000
 
     config.model = config_dict.ConfigDict()
     config.model.name = "v1"
+    config.model.path_normalization = "element"
+    config.model.gradient_normalization = "element"
     config.model.dummy = False
     config.model.equivariance = "E3"
     config.model.width = 6

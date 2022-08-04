@@ -179,16 +179,23 @@ TrainState = namedtuple(
 def init_train_loop(config, data_path, old_state, step, w, opt_state) -> TrainState:
     print("Prepare for the training loop...", flush=True)
 
-    train_set = [(i,) + load_miccai22(data_path, i) for i in config.trainset]
+    if config.seed_shuffle_data is None:
+        indices = list(range(1, 101))
+    else:
+        indices = jax.random.permutation(jax.random.PRNGKey(config.seed_shuffle_data), 100) + 1
+        indices = [int(i) for i in indices]
+
+    train_set = [(i,) + load_miccai22(data_path, i) for i in indices[: config.trainset]]
 
     test_set = []
     test_sample_size = np.array([200, 200, 25])
-    for i in config.testset:
+    for i in indices[::-1][: config.testset]:
         img, lab, zooms = load_miccai22(data_path, i)  # test data
         center_of_mass = np.stack(np.nonzero(lab == 1.0), axis=-1).mean(0).astype(np.int)
         start = np.maximum(center_of_mass - test_sample_size // 2, 0)
         end = np.minimum(start + test_sample_size, np.array(img.shape[:3]))
-        start = end - test_sample_size
+        start = np.maximum(end - test_sample_size, 0)
+
         img = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         lab = lab[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
         test_set.append((i, img, lab, zooms))
@@ -412,6 +419,9 @@ def eval_model(
 ) -> np.ndarray:
     assert img.ndim == 3 + 1
 
+    smaller_axis = np.argmin(img.shape[:3])
+    img = jnp.moveaxis(img, smaller_axis, 2)
+
     if size is None:
         size = sample_size
     if padding is None:
@@ -461,4 +471,6 @@ def eval_model(
     sum[num == 0] = negative_value
     num[num == 0] = 1.0
 
-    return sum / num
+    output = sum / num
+    output = jnp.moveaxis(output, 2, smaller_axis)
+    return output
