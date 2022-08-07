@@ -387,18 +387,20 @@ def multiresolution_experiments(checkpoint_dir,downsample,gpu):
     #train_val_multiresolution(checkpoint_dir,500, n=3,LOAD_CHECK_POINT=True,channels=3)
     predict_multiresolution(checkpoint_dir,n=3)
 
-#multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_full/',3,'cuda')
 
 def multiresolution_full_training(checkpoint_dir,downsample,gpu):
     train_val_multiresolution(checkpoint_dir,500, n=3,gpu=gpu,save_only_min=False,LOAD_CHECK_POINT=True,channels=3)
     #predict_multiresolution(checkpoint_dir,n=3)
 
-#multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/',3,'cuda')
-
-#predict_evaluation('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/', 'model_058.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
 
 def multiresolution_full_training_one_channel(checkpoint_dir,downsample,gpu):
     train_val_multiresolution(checkpoint_dir,500, n=3,save_only_min=False,LOAD_CHECK_POINT=True, channels=1)
 
-multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_mres_full_3channel/',3,'cuda:1')
+#multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/',3,'cuda')
+#predict_evaluation('/home/diaz/experiments/INSTANCE2022_multiresolution_no_validation/', 'model_058.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
+#multiresolution_experiments('/home/diaz/experiments/INSTANCE2022_multiresolution_full/',3,'cuda')
+#multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_mres_full_3channel/',3,'cuda:1')
 #multiresolution_full_training_one_channel('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/',3,'cuda')
+
+predict_evaluation('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/', 'model_064.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
+predict_evaluation('/home/diaz/experiments/INSTANCE2022_mres_full_3channel/', 'model_053.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
