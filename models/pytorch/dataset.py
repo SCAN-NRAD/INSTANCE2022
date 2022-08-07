@@ -270,6 +270,7 @@ class INSTANCE_2022_evaluation(Dataset):
 
         img = nib.load(img_file[0])
         img_affine = img.affine
+        img_header = img.header
         res = img.header.get_zooms()
 
         img = img.get_fdata()
@@ -310,5 +311,5 @@ class INSTANCE_2022_evaluation(Dataset):
             'name' : idx,
             'affine': img_affine,
             'res': res,
-            'header': img.header
+            'header': img_header
         }
