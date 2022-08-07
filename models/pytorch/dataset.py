@@ -309,5 +309,6 @@ class INSTANCE_2022_evaluation(Dataset):
             'image': channels,
             'name' : idx,
             'affine': img_affine,
-            'res': res
+            'res': res,
+            'header': img.header
         }

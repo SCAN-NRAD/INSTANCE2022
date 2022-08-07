@@ -378,15 +378,14 @@ def predict_evaluation(checkpoint_dir, model_name, gpu='cuda', downsample = 3, c
 
         output = model.predict_3D(img.cpu().numpy(),do_mirroring=False, patch_size=(128,128,128),
                                 use_sliding_window=True, use_gaussian = True,verbose=False)
-
+        output  = output.astype(np.uint8)
         pred_file_name = sav_dir+os.path.basename(batch['name'][0])
-        nib.save(nib.Nifti1Image(output[0],affine = batch['affine'][0].numpy()),pred_file_name)
+        nib.save(nib.Nifti1Image(output[0],affine = batch['affine'][0].numpy(),header=batch['header']),pred_file_name)
 
 
 def multiresolution_experiments(checkpoint_dir,downsample,gpu):
     #train_val_multiresolution(checkpoint_dir,500, n=3,LOAD_CHECK_POINT=True,channels=3)
     predict_multiresolution(checkpoint_dir,n=3)
-
 
 def multiresolution_full_training(checkpoint_dir,downsample,gpu):
     train_val_multiresolution(checkpoint_dir,500, n=3,gpu=gpu,save_only_min=False,LOAD_CHECK_POINT=True,channels=3)
