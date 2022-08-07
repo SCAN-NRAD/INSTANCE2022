@@ -402,5 +402,5 @@ def multiresolution_full_training_one_channel(checkpoint_dir,downsample,gpu):
 #multiresolution_full_training('/home/diaz/experiments/INSTANCE2022_mres_full_3channel/',3,'cuda:1')
 #multiresolution_full_training_one_channel('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/',3,'cuda')
 
-predict_evaluation('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/', 'model_064.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
+predict_evaluation('/home/diaz/experiments/INSTANCE2022_mres_full_1channel/', 'model_064.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3,nchannels=1)
 predict_evaluation('/home/diaz/experiments/INSTANCE2022_mres_full_3channel/', 'model_053.pt', gpu='cuda', downsample = 3, cutoff='right',equivariance='SO3',n=3)
