@@ -487,7 +487,8 @@ def eval_model(
         return x
 
     xs = jnp.stack(xs, axis=0)
-    ps = jnp.concatenate([apply(slice(xs, i, i + 8)) for i in range(0, len(xs), 8)])
+    n_parallel = 4
+    ps = jnp.concatenate([apply(slice(xs, i, i + n_parallel)) for i in range(0, len(xs), n_parallel)])
     ps = ps[: len(xs)]
     ps = jax.vmap(unpad, (0, None), 0)(ps, padding)
 
