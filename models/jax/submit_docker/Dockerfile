@@ -23,7 +23,7 @@ COPY diffeomorphism.py /home/diffeomorphism.py
 CMD ["python3", "/home/evaluate.py"]
 
 # To Build:
-#   $ docker build -t bern_mit .
+#   $ docker build -t scan .
 
 # To Run:
-#   $ docker run --gpus "device=0" -v PATH:/input -v PATH:/predict bern_mit:latest
+#   $ docker run --gpus "device=0" -v PATH:/input -v PATH:/predict scan:latest
