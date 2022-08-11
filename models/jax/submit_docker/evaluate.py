@@ -23,8 +23,8 @@ def apply(w, x, zooms):
     return jax.vmap(f, (None, 0, None), 0)(w, x, zooms)
 
 
-images = sorted(glob.glob(f"/input/*.nii.gz"))
-weights = sorted(glob.glob(f"/home/*.pkl"))
+images = sorted(glob.glob("/input/*.nii.gz"))
+weights = sorted(glob.glob("/home/*.pkl"))
 t0 = time.perf_counter()
 
 for i, image_path in enumerate(images):
@@ -37,7 +37,12 @@ for i, image_path in enumerate(images):
 
         image = nib.load(image_path)
         img = preprocess_miccai22_image(image.get_fdata())
-        pred = eval_model(img, lambda x: apply(w, x, round_zooms(image.header.get_zooms())), overlap=1.1, verbose=True)
+        pred = eval_model(
+            img,
+            lambda x: apply(w, x, round_zooms(image.header.get_zooms())),
+            overlap=1.1,
+            verbose=True,
+        )
         sum_pred += pred
 
         s = time.perf_counter() - t0

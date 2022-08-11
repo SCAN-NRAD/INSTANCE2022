@@ -99,7 +99,10 @@ def main(_):
         print("Initializing model...", flush=True)
         t = time.perf_counter()
         w = model.init(jax.random.PRNGKey(config.seed_init), img[:100, :100, :25], zooms)
-        print(f"Initialized model in {functions.format_time(time.perf_counter() - t)}", flush=True)
+        print(
+            f"Initialized model in {functions.format_time(time.perf_counter() - t)}",
+            flush=True,
+        )
 
     def opt(lr):
         if config.optimizer.algorithm == "adam":

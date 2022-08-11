@@ -178,7 +178,10 @@ def create_model(config):
             assert len(vox2.data.shape) == 1 + 3 + 1 + 1
             assert vox1.zooms == vox2.zooms
             assert vox1.data.irreps == vox2.data.irreps
-            return Voxels(zooms=vox1.zooms, data=e3nn.IrrepsArray.cat([vox1.data, vox2.data], axis=-2))
+            return Voxels(
+                zooms=vox1.zooms,
+                data=e3nn.IrrepsArray.cat([vox1.data, vox2.data], axis=-2),
+            )
 
         def upcat(low_vox: Voxels, high_vox: Voxels) -> Voxels:
             assert len(low_vox.data.shape) == 1 + 3 + 1 + 1
@@ -272,7 +275,10 @@ def create_model(config):
         x = upcat(x, x_a)
         min_zoom /= config.downsampling
         x = cbg(
-            x, mul, filter=["0e", "1o", "2e"] if config.equivariance == "E3" else ["0e", "1e", "2e"], radius=cvrad * min_zoom
+            x,
+            mul,
+            filter=["0e", "1o", "2e"] if config.equivariance == "E3" else ["0e", "1e", "2e"],
+            radius=cvrad * min_zoom,
         )
 
         x = group_conv(x, irreps="0e", mul=round(2 * mul), radius=cvrad * min_zoom)

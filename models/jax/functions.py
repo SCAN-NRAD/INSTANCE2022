@@ -18,7 +18,9 @@ from jax.scipy.special import logsumexp
 @jax.jit
 def noise_mri(rng, img):
     assert img.shape[0] == img.shape[1]
-    noise = jax.vmap(lambda r: scalar_field(img.shape[0], 128, r), 0, 2)(jax.random.split(rng, img.shape[2] * img.shape[3]))
+    noise = jax.vmap(lambda r: scalar_field(img.shape[0], 128, r), 0, 2)(
+        jax.random.split(rng, img.shape[2] * img.shape[3])
+    )
     return img + 1e-2 * jnp.reshape(noise, img.shape)
 
 
@@ -172,7 +174,16 @@ def confusion_matrix(y: jnp.ndarray, p: jnp.ndarray) -> jnp.ndarray:
 
 TrainState = namedtuple(
     "TrainState",
-    ["time0", "train_set", "test_set", "t4", "losses", "best_sorted_dices", "rng", "w_eval"],
+    [
+        "time0",
+        "train_set",
+        "test_set",
+        "t4",
+        "losses",
+        "best_sorted_dices",
+        "rng",
+        "w_eval",
+    ],
 )
 
 
@@ -274,12 +285,17 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
     t1 = time.perf_counter()
 
     lr = config.optimizer.lr * max(
-        config.optimizer.lr_div_factor ** math.floor(step / config.optimizer.lr_div_step), config.optimizer.lr_div_factor_min
+        config.optimizer.lr_div_factor ** math.floor(step / config.optimizer.lr_div_step),
+        config.optimizer.lr_div_factor_min,
     )
     w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr, train_padding)
     train_loss.block_until_ready()
 
-    w_eval = jax.tree_map(lambda x, y: (1.0 - config.weight_avg) * x + config.weight_avg * y, state.w_eval, w)
+    w_eval = jax.tree_map(
+        lambda x, y: (1.0 - config.weight_avg) * x + config.weight_avg * y,
+        state.w_eval,
+        w,
+    )
 
     t2 = time.perf_counter()
     c = np.array(confusion_matrix(unpad(lab, sample_padding), unpad(train_pred, sample_padding)))
@@ -320,7 +336,11 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
         with np.errstate(invalid="ignore"):
             dice = 2 * c[:, 1, 1] / (2 * c[:, 1, 1] + c[:, 1, 0] + c[:, 0, 1])
 
-        wandb.log({f"dice_{i}": d for (i, _, _, _), d in zip(state.test_set, dice)}, commit=False, step=step)
+        wandb.log(
+            {f"dice_{i}": d for (i, _, _, _), d in zip(state.test_set, dice)},
+            commit=False,
+            step=step,
+        )
 
         sorted_dices = np.sort(dice)
         for i, (old_dice, new_dice) in enumerate(zip(state.best_sorted_dices, sorted_dices)):

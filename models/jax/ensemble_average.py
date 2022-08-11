@@ -9,7 +9,13 @@ import numpy as np
 
 def main():
     parser = argparse.ArgumentParser(description="Ensemble average")
-    parser.add_argument("--path_predictions", type=str, required=True, nargs="+", help="Path to predictions")
+    parser.add_argument(
+        "--path_predictions",
+        type=str,
+        required=True,
+        nargs="+",
+        help="Path to predictions",
+    )
     parser.add_argument("--path_output", type=str, required=True, help="Path to output")
     parser.add_argument("--path_output_float", type=str, required=False, help="Path to output")
 
@@ -49,7 +55,10 @@ def main():
 
         if args.path_output_float is not None:
             path = os.path.join(args.path_output_float, name)
-            nib.save(nib.Nifti1Image(x, affine_headers[name][0], affine_headers[name][1]), path)
+            nib.save(
+                nib.Nifti1Image(x, affine_headers[name][0], affine_headers[name][1]),
+                path,
+            )
 
         x = (np.sign(x - args.threshold) + 1) / 2
         x = x.astype(np.uint8)

@@ -26,7 +26,11 @@ def main():
 
     sys.path.insert(0, args.path_scripts)
     import model  # noqa: F401
-    from functions import eval_model, preprocess_miccai22_image, round_zooms  # noqa: F401
+    from functions import (
+        eval_model,
+        preprocess_miccai22_image,
+        round_zooms,
+    )  # noqa: F401
 
     # Load model args
     with open(args.path_config, "rb") as f:
@@ -63,14 +67,25 @@ def main():
 
         image = nib.load(image_path)
         img = preprocess_miccai22_image(image.get_fdata())
-        pred = eval_model(img, lambda x: apply(w, x, round_zooms(image.header.get_zooms())), overlap=2.0, verbose=True)
+        pred = eval_model(
+            img,
+            lambda x: apply(w, x, round_zooms(image.header.get_zooms())),
+            overlap=2.0,
+            verbose=True,
+        )
         print(flush=True)
 
-        nib.save(nib.Nifti1Image(pred, image.affine, image.header), f"{args.path_output}/{os.path.basename(image_path)}")
+        nib.save(
+            nib.Nifti1Image(pred, image.affine, image.header),
+            f"{args.path_output}/{os.path.basename(image_path)}",
+        )
 
         if label_path is not None:
             if os.path.basename(image_path) != os.path.basename(label_path):
-                print(f"Image and label names do not match: {image_path} {label_path}", flush=True)
+                print(
+                    f"Image and label names do not match: {image_path} {label_path}",
+                    flush=True,
+                )
 
             label = nib.load(label_path)
             y_gt = label.get_fdata()
