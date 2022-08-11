@@ -18,9 +18,7 @@ from jax.scipy.special import logsumexp
 @jax.jit
 def noise_mri(rng, img):
     assert img.shape[0] == img.shape[1]
-    noise = jax.vmap(lambda r: scalar_field(img.shape[0], 128, r), 0, 2)(
-        jax.random.split(rng, img.shape[2] * img.shape[3])
-    )
+    noise = jax.vmap(lambda r: scalar_field(img.shape[0], 128, r), 0, 2)(jax.random.split(rng, img.shape[2] * img.shape[3]))
     return img + 1e-2 * jnp.reshape(noise, img.shape)
 
 
@@ -110,7 +108,7 @@ def random_sample(
     rng: jnp.ndarray, x: jnp.ndarray, target_sizes: Tuple[int, int, int]
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     rng = jax.random.split(rng, 4)
-    starts = jax.tree_map(random_slice, tuple(rng[:3]), x.shape[:3], target_sizes)
+    starts = jax.tree_util.tree_map(random_slice, tuple(rng[:3]), x.shape[:3], target_sizes)
     starts = starts + (0,) * (x.ndim - 3)
     target_sizes = target_sizes + x.shape[3:]
     return jax.lax.dynamic_slice(x, starts, target_sizes), rng[3]
@@ -229,7 +227,7 @@ train_padding = sample_padding
 
 
 def round_zooms(zooms: Tuple[float, float, float]) -> Tuple[float, float, float]:
-    return jax.tree_map(lambda x: round_mantissa(x, 4), zooms)
+    return jax.tree_util.tree_map(lambda x: round_mantissa(x, 4), zooms)
 
 
 @partial(jax.jit, static_argnums=(1,))
@@ -291,7 +289,7 @@ def train_loop(config, state: TrainState, step, w, opt_state, update, apply_mode
     w, opt_state, train_loss, train_pred = update(w, opt_state, img, lab, zooms, lr, train_padding)
     train_loss.block_until_ready()
 
-    w_eval = jax.tree_map(
+    w_eval = jax.tree_util.tree_map(
         lambda x, y: (1.0 - config.weight_avg) * x + config.weight_avg * y,
         state.w_eval,
         w,
