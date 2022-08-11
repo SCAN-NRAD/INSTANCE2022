@@ -18,9 +18,7 @@ from jax.scipy.special import logsumexp
 @jax.jit
 def noise_mri(rng, img):
     assert img.shape[0] == img.shape[1]
-    noise = jax.vmap(lambda r: scalar_field(img.shape[0], 128, r), 0, 2)(
-        jax.random.split(rng, img.shape[2] * img.shape[3])
-    )
+    noise = jax.vmap(lambda r: scalar_field(img.shape[0], 128, r), 0, 2)(jax.random.split(rng, img.shape[2] * img.shape[3]))
     return img + 1e-2 * jnp.reshape(noise, img.shape)
 
 
@@ -464,34 +462,6 @@ def eval_model(
     ii = patch_slices(img.shape[0], size[0], padding[0], overlap)
     jj = patch_slices(img.shape[1], size[1], padding[1], overlap)
     kk = patch_slices(img.shape[2], size[2], padding[2], overlap)
-
-    # sum = np.zeros_like(img[:, :, :, 0])
-    # num = np.zeros_like(img[:, :, :, 0])
-    # step = 0
-    # for i in ii:
-    #     for j in jj:
-    #         for k in kk:
-    #             x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
-    #             p = apply(x)
-    #             p = unpad(p, padding)
-
-    #             sum[
-    #                 i + padding[0] : i + size[0] - padding[0],
-    #                 j + padding[1] : j + size[1] - padding[1],
-    #                 k + padding[2] : k + size[2] - padding[2],
-    #             ] += (
-    #                 p * gaussian
-    #             )
-    #             num[
-    #                 i + padding[0] : i + size[0] - padding[0],
-    #                 j + padding[1] : j + size[1] - padding[1],
-    #                 k + padding[2] : k + size[2] - padding[2],
-    #             ] += gaussian
-
-    #             step += 1
-
-    #             if verbose and step % 50 == 0:
-    #                 print(f"{step}/{len(ii) * len(jj) * len(kk)}", flush=True)
 
     xs = []
     for i in ii:

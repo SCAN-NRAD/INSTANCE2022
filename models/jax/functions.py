@@ -459,15 +459,38 @@ def eval_model(
     )
     gaussian = np.exp(-np.linalg.norm(pos, axis=-1) ** 2)
 
+    ii = patch_slices(img.shape[0], size[0], padding[0], overlap)
+    jj = patch_slices(img.shape[1], size[1], padding[1], overlap)
+    kk = patch_slices(img.shape[2], size[2], padding[2], overlap)
+
+    xs = []
+    for i in ii:
+        for j in jj:
+            for k in kk:
+                x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
+                xs.append(x)
+
+    def slice(x, start, end):
+        x = x[start:end]
+        if x.shape[0] < end - start:
+            x = jnp.concatenate([x, jnp.zeros((end - start - x.shape[0],) + x.shape[1:])], axis=0)
+        return x
+
+    xs = jnp.stack(xs, axis=0)
+    n_parallel = 4
+    ps = jnp.concatenate([apply(slice(xs, i, i + n_parallel)) for i in range(0, len(xs), n_parallel)])
+    ps = ps[: len(xs)]
+    ps = jax.vmap(unpad, (0, None), 0)(ps, padding)
+
     sum = np.zeros_like(img[:, :, :, 0])
     num = np.zeros_like(img[:, :, :, 0])
 
-    for i in patch_slices(img.shape[0], size[0], padding[0], overlap):
-        for j in patch_slices(img.shape[1], size[1], padding[1], overlap):
-            for k in patch_slices(img.shape[2], size[2], padding[2], overlap):
-                x = img[i : i + size[0], j : j + size[1], k : k + size[2]]
-                p = apply(x)
-                p = unpad(p, padding)
+    index = 0
+    for i in ii:
+        for j in jj:
+            for k in kk:
+                p = ps[index]
+                index += 1
 
                 sum[
                     i + padding[0] : i + size[0] - padding[0],
@@ -481,9 +504,6 @@ def eval_model(
                     j + padding[1] : j + size[1] - padding[1],
                     k + padding[2] : k + size[2] - padding[2],
                 ] += gaussian
-
-                if verbose:
-                    print(i, j, k, flush=True)
 
     negative_value = -10.0
     sum[num == 0] = negative_value
