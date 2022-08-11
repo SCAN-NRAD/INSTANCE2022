@@ -1,4 +1,14 @@
 
+Dependancies
+- jax
+- https://github.com/e3nn/e3nn-jax (home made)
+- haiku
+- optax
+- ml_collections
+- absl
+- wandb
+- nibabel
+
 To train the network, we use the script `main.py`. The training loop is defined in `functions.py`. The configuration files are in the folder `configs/`. We used `submit2.py` for the last submission. The files for the submission are in the directory `submit_docker/`.
 
 Command used to train the networks for the submission:
