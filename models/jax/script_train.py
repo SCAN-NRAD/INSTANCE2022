@@ -76,7 +76,7 @@ def main(_):
     shutil.copy(__file__, f"{wandb.run.dir}/main.py")
     shutil.copy(f"./models/{config.model.name}.py", f"{wandb.run.dir}/model.py")
     shutil.copy("./functions.py", f"{wandb.run.dir}/functions.py")
-    shutil.copy("./evaluate.py", f"{wandb.run.dir}/evaluate.py")
+    shutil.copy("./script_evaluate.py", f"{wandb.run.dir}/evaluate.py")
     shutil.copy("./diffeomorphism.py", f"{wandb.run.dir}/diffeomorphism.py")
     sys.path.insert(0, wandb.run.dir)
     import functions
