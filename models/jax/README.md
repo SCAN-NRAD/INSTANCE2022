@@ -25,3 +25,20 @@ python script_train.py --name mynetwork6 --config configs/submit2.py --config.se
 ```
 
 Command used to evaluate? see the file `submit_docker/Dockerfile`.
+
+Version of libraries:
+
+```
+chex                   0.1.4
+dm-haiku               0.0.7
+e3nn-jax               0.8.0
+jax                    0.3.15
+jaxlib                 0.3.15+cuda11.cudnn82
+ml-collections         0.1.1
+nibabel                4.0.1
+numpy                  1.23.1
+optax                  0.1.3
+pip                    22.2.2
+scipy                  1.8.1
+wandb                  0.13.1
+```
